@@ -422,13 +422,14 @@
         display: flex;
         align-items: baseline;
         gap: 6px;
+        border-bottom: 1px solid var(--gg-colors-surface);
 
         /* skip past svg lines when used in a graph */
         padding-left: var(--leftpad);
     }
 
     .layout.target {
-        background: var(--ctp-flamingo);
+        background: var(--gg-colors-accent);
         color: black;
     }
 
@@ -437,17 +438,20 @@
     }
 
     .desc {
+        grid-area: desc;
+        font-family: var(--gg-text-familyUi);
         flex: 1 1 0;
         min-width: 0;
     }
 
     .desc.indescribable {
-        color: var(--ctp-subtext0);
+        color: var(--gg-colors-foregroundMuted);
     }
 
     .email {
         display: none;
         text-align: right;
+        font-family: var(--gg-text-familyUi);
         flex: 0 0 auto;
     }
 
@@ -457,7 +461,7 @@
         display: flex;
         justify-content: end;
         gap: 3px;
-        color: var(--ctp-text);
+        color: var(--gg-colors-foreground);
         min-width: 0;
         overflow: hidden;
     }
