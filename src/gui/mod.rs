@@ -855,6 +855,22 @@ pub fn try_create_window(
         return Ok(());
     }
 
+    let app_state = app_handle.state::<AppState>();
+    let settings = app_state.settings.clone();
+
+    // inject theme CSS before the frontend mounts, so even error/timeout
+    // states have styling
+    let theme_css = gg_lib::theme::generate_css(&settings);
+    let init_script = format!(
+        r#"(() => {{
+            let s = document.createElement("style");
+            s.id = "gg-theme";
+            s.textContent = {css_json};
+            (document.head || document.documentElement).appendChild(s);
+        }})()"#,
+        css_json = serde_json::to_string(&theme_css).unwrap_or_default(),
+    );
+
     // configure and register a new window
     let window = WebviewWindowBuilder::new(
         app_handle,
@@ -866,10 +882,8 @@ pub fn try_create_window(
     .focused(true)
     .visible(false)
     .disable_drag_drop_handler()
+    .initialization_script(&init_script)
     .build()?;
-
-    let app_state = app_handle.state::<AppState>();
-    let settings = app_state.settings.clone();
 
     // create a worker for the specified path
     let (sender, receiver) = channel();
