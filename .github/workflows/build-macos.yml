@@ -1,0 +1,54 @@
+name: 'build-macos'
+
+on:
+  workflow_dispatch:
+    inputs:
+      universal:
+        description: 'Build universal binary (Intel + Apple Silicon)'
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: add targets
+        if: inputs.universal
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+
+      - name: short git hash
+        id: git
+        run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: install frontend dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@action-v0.5.25
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_PROFILE_RELEASE_LTO: 'true'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '1'
+        with:
+          args: ${{ inputs.universal && '--target universal-apple-darwin --verbose' || '--verbose' }}
+          tagName: v__VERSION__-dev-${{ steps.git.outputs.sha }}
+          releaseName: 'GG __VERSION__ (unsigned @ ${{ steps.git.outputs.sha }})'
+          releaseBody: 'Unsigned macOS build for internal use.'
+          releaseDraft: true
+          prerelease: true
