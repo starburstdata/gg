@@ -133,9 +133,9 @@
         align-items: stretch;
         gap: 2px;
         padding: 0 8px;
-        background: var(--gg-colors-surfaceDeep);
-        border-bottom: 1px solid var(--gg-colors-surfaceAlt);
-        font-family: var(--gg-text-familyUi);
+        background: var(--ju-colors-surfaceDeep);
+        border-bottom: 1px solid var(--ju-colors-surfaceAlt);
+        font-family: var(--ju-text-familyUi);
     }
 
     .toolbar-group {
@@ -149,7 +149,7 @@
         width: 1px;
         align-self: stretch;
         margin: 6px 0;
-        background: var(--gg-colors-surfaceStrong);
+        background: var(--ju-colors-surfaceStrong);
         flex-shrink: 0;
     }
 </style>

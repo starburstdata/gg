@@ -19,9 +19,9 @@
         background: none;
         border: none;
 
-        color: var(--gg-colors-success);
-        font-family: var(--gg-text-familyDisplay);
-        font-size: var(--gg-text-sizeLg);
+        color: var(--ju-colors-success);
+        font-family: var(--ju-text-familyDisplay);
+        font-size: var(--ju-text-sizeLg);
 
         display: flex;
         align-items: center;
@@ -30,11 +30,11 @@
 
     button:not(:disabled) {
         &:hover {
-            color: var(--gg-colors-success);
+            color: var(--ju-colors-success);
         }
         &:focus-visible {
             text-decoration: underline;
-            outline: solid 2px var(--gg-colors-focusRing);
+            outline: solid 2px var(--ju-colors-focusRing);
             border-radius: 3px;
         }
         &:active {
@@ -43,7 +43,7 @@
     }
 
     button:disabled {
-        background: var(--gg-colors-surface);
-        color: var(--gg-colors-foregroundSubtle);
+        background: var(--ju-colors-surface);
+        color: var(--ju-colors-foregroundSubtle);
     }
 </style>

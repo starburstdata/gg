@@ -25,26 +25,26 @@
 <style>
     circle {
         pointer-events: none;
-        stroke: var(--gg-colors-immutableStroke);
-        fill: var(--gg-colors-immutableFill);
+        stroke: var(--ju-colors-immutableStroke);
+        fill: var(--ju-colors-immutableFill);
     }
 
     .wc {
-        stroke: var(--gg-colors-workingCopyStroke);
-        fill: var(--gg-colors-workingCopyFill);
+        stroke: var(--ju-colors-workingCopyStroke);
+        fill: var(--ju-colors-workingCopyFill);
     }
 
     .other-wc {
-        stroke: var(--gg-colors-warning);
-        fill: var(--gg-colors-warning);
+        stroke: var(--ju-colors-warning);
+        fill: var(--ju-colors-warning);
     }
 
     .context {
-        stroke: var(--gg-colors-accent);
-        fill: var(--gg-colors-accent);
+        stroke: var(--ju-colors-accent);
+        fill: var(--ju-colors-accent);
     }
 
     .mutable {
-        fill: var(--gg-colors-mutableFill);
+        fill: var(--ju-colors-mutableFill);
     }
 </style>

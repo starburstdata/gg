@@ -37,7 +37,7 @@
         padding-left: 6px;
         cursor: pointer;
         width: 100%;
-        height: var(--gg-components-buttonHeight);
+        height: var(--ju-components-buttonHeight);
         font-size: 14px;
 
         &:focus-visible {
@@ -54,7 +54,7 @@
     .wrapper > :global(:last-child) {
         position: absolute;
         right: 6px;
-        height: var(--gg-components-buttonHeight);
+        height: var(--ju-components-buttonHeight);
     }
 
     select {
@@ -108,7 +108,7 @@
         }
 
         .separator {
-            border-color: var(--gg-colors-outline);
+            border-color: var(--ju-colors-outline);
             margin: 6px 0;
         }
     }

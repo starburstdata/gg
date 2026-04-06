@@ -1,7 +1,7 @@
 {
-  "name": "gg",
+  "name": "jjuicy",
   "private": true,
-  "version": "0.39.1",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "check": "svelte-check --tsconfig ./tsconfig.json",

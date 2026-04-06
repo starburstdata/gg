@@ -15,7 +15,7 @@ jobs:
         echo "anchor=${version//.}" >> "$GITHUB_OUTPUT"
     - uses: vedantmgoyal9/winget-releaser@main
       with:
-        identifier: gulbanana.gg
+        identifier: starburst.jjuicy
         installers-regex: '\.msi$' # as opposed to '\.exe$'
         release-notes-url: https://github.com/gulbanana/gg/blob/master/CHANGELOG.md#${{ steps.changelog.outputs.anchor }}
         token: ${{ secrets.WINGET_TOKEN }}

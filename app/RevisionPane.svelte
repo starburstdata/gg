@@ -108,7 +108,7 @@
         changeSelectEvent.set(syntheticChanges[0]);
     }
 
-    onEvent<string>("gg://menu/revision", (event) => mutator.handle(event));
+    onEvent<string>("jjuicy://menu/revision", (event) => mutator.handle(event));
 
     function lineColour(line: string): string | null {
         if (line.startsWith("+")) {
@@ -334,9 +334,9 @@
         align-items: baseline;
         gap: 0 6px;
         font-size: 13px;
-        font-family: var(--gg-text-familyUi);
+        font-family: var(--ju-text-familyUi);
         line-height: 1.8;
-        background: var(--gg-colors-background);
+        background: var(--ju-colors-background);
         margin: 0;
         padding: 3px;
     }
@@ -354,15 +354,15 @@
     }
 
     .meta-label {
-        color: var(--gg-colors-foregroundMuted);
+        color: var(--ju-colors-foregroundMuted);
     }
 
     .meta-sep {
-        color: var(--gg-colors-outlineStrong);
+        color: var(--ju-colors-outlineStrong);
     }
 
     .meta-flag {
-        color: var(--gg-colors-foregroundMuted);
+        color: var(--ju-colors-foregroundMuted);
         font-style: italic;
     }
 
@@ -384,12 +384,12 @@
         min-height: 60px;
         flex-shrink: 0;
         overflow: auto;
-        font-size: var(--gg-text-sizeMd);
+        font-size: var(--ju-text-sizeMd);
     }
 
     .description-separator {
         height: 3px;
-        background: var(--gg-colors-surfaceAlt);
+        background: var(--ju-colors-surfaceAlt);
         cursor: row-resize;
         position: relative;
         pointer-events: auto;
@@ -398,7 +398,7 @@
 
     .description-separator:hover,
     .description-separator:active {
-        background: var(--gg-colors-surfaceStrong);
+        background: var(--ju-colors-surfaceStrong);
     }
 
     .description-separator .hit-area {
@@ -426,9 +426,9 @@
 
         white-space: pre-wrap;
         user-select: text;
-        font-size: var(--gg-text-sizeMd);
+        font-size: var(--ju-text-sizeMd);
 
-        color: var(--gg-colors-foregroundMuted);
+        color: var(--ju-colors-foregroundMuted);
     }
 
     .description-row {
@@ -437,7 +437,7 @@
 
     .description-divider {
         border: none;
-        border-top: 1px dashed var(--gg-colors-outline);
+        border-top: 1px dashed var(--ju-colors-outline);
         margin: 4px 1px;
     }
 
@@ -454,9 +454,9 @@
         display: flex;
         align-items: center;
         gap: 4px;
-        font-family: var(--gg-text-familyUi);
+        font-family: var(--ju-text-familyUi);
         font-size: 13px;
-        color: var(--gg-colors-foregroundMuted);
+        color: var(--ju-colors-foregroundMuted);
         cursor: pointer;
         user-select: none;
     }
@@ -471,7 +471,7 @@
     }
 
     .parents {
-        border-top: 1px solid var(--gg-colors-outline);
+        border-top: 1px solid var(--ju-colors-outline);
         padding: 0 3px;
         font-size: 0.9em;
     }
@@ -484,7 +484,7 @@
     }
 
     .changes-header {
-        border-top: 1px solid var(--gg-colors-outline);
+        border-top: 1px solid var(--ju-colors-outline);
         height: 30px;
         min-height: 30px;
         width: 100%;
@@ -492,16 +492,16 @@
         display: flex;
         align-items: center;
         gap: 6px;
-        color: var(--gg-colors-foregroundMuted);
+        color: var(--ju-colors-foregroundMuted);
         font-size: 13px;
     }
 
     .no-changes {
-        color: var(--gg-colors-foregroundMuted);
+        color: var(--ju-colors-foregroundMuted);
     }
 
     .changes {
-        border-top: 1px solid var(--gg-colors-outline);
+        border-top: 1px solid var(--ju-colors-outline);
         display: flex;
         flex-direction: column;
         pointer-events: auto;
@@ -516,23 +516,23 @@
     .hunk {
         margin: 0;
         text-align: center;
-        background: var(--gg-colors-surface);
+        background: var(--ju-colors-surface);
     }
 
     .diff {
         margin: 0;
-        background: var(--gg-colors-background);
-        font-family: var(--gg-text-familyCode);
-        font-size: var(--gg-text-sizeMd);
+        background: var(--ju-colors-background);
+        font-family: var(--ju-text-familyCode);
+        font-size: var(--ju-text-sizeMd);
         user-select: text;
     }
 
     .add {
-        color: var(--gg-colors-success);
+        color: var(--ju-colors-success);
     }
 
     .remove {
-        color: var(--gg-colors-error);
+        color: var(--ju-colors-error);
     }
 
     .conflict-region {
@@ -551,7 +551,7 @@
     }
 
     .target {
-        color: var(--gg-colors-primaryContent);
-        background: var(--gg-colors-primary);
+        color: var(--ju-colors-primaryContent);
+        background: var(--ju-colors-primary);
     }
 </style>

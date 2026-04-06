@@ -1,6 +1,6 @@
 //! conceptually similar to jj_cli::git_util, except non-blocking
 //!
-//! gg acts as server (started by a user) and client (started by git) to implement the askpass
+//! jjuicy acts as server (started by a user) and client (started by git) to implement the askpass
 //! protocol. its own ipc protocol is trivial, yet underspecified: the client sends newline-delimited
 //! prompts to the server, which responds with either OK:(existing InputResponse) or NO if it needs
 //! to provision an InputRequest first.
@@ -37,7 +37,7 @@ impl GitSubprocessCallback for SinkSubprogressCallback {
     fn progress(&mut self, progress: &GitProgress) -> io::Result<()> {
         if let Some(sink) = &self.0 {
             sink.send_typed(
-                "gg://progress",
+                "jjuicy://progress",
                 &crate::messages::ProgressEvent::Progress {
                     overall_percent: (progress.overall() * 100.0) as u32,
                 },
@@ -57,7 +57,7 @@ impl GitSubprocessCallback for SinkSubprogressCallback {
             let trimmed = text.trim();
             if !trimmed.is_empty() {
                 sink.send_typed(
-                    "gg://progress",
+                    "jjuicy://progress",
                     &crate::messages::ProgressEvent::Message {
                         text: trimmed.to_string(),
                     },
@@ -78,7 +78,7 @@ impl GitSubprocessCallback for SinkSubprogressCallback {
             let trimmed = text.trim();
             if !trimmed.is_empty() {
                 sink.send_typed(
-                    "gg://progress",
+                    "jjuicy://progress",
                     &crate::messages::ProgressEvent::Message {
                         text: format!("remote: {trimmed}"),
                     },
@@ -183,7 +183,7 @@ mod tests {
 
         ctx.with_callbacks(None, true, |_cb, environment| {
             let socket_path = environment
-                .get(&OsString::from("GG_ASKPASS_SOCKET"))
+                .get(&OsString::from("JJUICY_ASKPASS_SOCKET"))
                 .expect("socket env set")
                 .clone();
             let name = socket_path
@@ -210,7 +210,7 @@ mod tests {
 
         ctx.with_callbacks(None, true, |_cb, environment| {
             let socket_path = environment
-                .get(&OsString::from("GG_ASKPASS_SOCKET"))
+                .get(&OsString::from("JJUICY_ASKPASS_SOCKET"))
                 .expect("socket env set")
                 .clone();
             let name = socket_path

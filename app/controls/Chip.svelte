@@ -14,7 +14,7 @@
     .chip {
         pointer-events: auto;
 
-        font-family: var(--gg-text-familyCode);
+        font-family: var(--ju-text-familyCode);
         font-size: smaller;
 
         height: 24px;
@@ -22,11 +22,11 @@
 
         display: flex;
         align-items: center;
-        border: var(--gg-components-borderSubtle);
+        border: var(--ju-components-borderSubtle);
         border-radius: 12px;
-        transition: background var(--gg-components-transitionFast);
+        transition: background var(--ju-components-transitionFast);
         padding: 0 6px;
-        background: var(--gg-colors-surface);
+        background: var(--ju-colors-surface);
         white-space: nowrap;
         gap: 3px;
     }
@@ -37,8 +37,8 @@
     }
 
     .target {
-        background: var(--gg-colors-selectionBackground);
-        color: var(--gg-colors-selectionForeground);
+        background: var(--ju-colors-selectionBackground);
+        color: var(--ju-colors-selectionForeground);
     }
 
     .disconnected {

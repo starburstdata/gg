@@ -827,11 +827,11 @@ fn format_conflict_hunks(
             ));
             let base_content = removes[0];
             let side_content = adds[other_idx];
-            let diff_hunks =
-                get_unified_hunks(3, base_content.as_ref(), side_content.as_ref())?;
+            let diff_hunks = get_unified_hunks(3, base_content.as_ref(), side_content.as_ref())?;
             if diff_hunks.is_empty() {
                 // base and kept side are identical
-                cur.lines.push(format!(" +++++++ {kept_label} (unchanged)\n"));
+                cur.lines
+                    .push(format!(" +++++++ {kept_label} (unchanged)\n"));
                 for line in String::from_utf8_lossy(side_content).lines() {
                     cur.lines.push(format!(" {line}\n"));
                     cur.from_len += 1;

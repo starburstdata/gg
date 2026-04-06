@@ -18,7 +18,7 @@ use super::{
 };
 
 use crate::{
-    config::{GGSettings, read_config},
+    config::{JjuicySettings, read_config},
     messages,
 };
 

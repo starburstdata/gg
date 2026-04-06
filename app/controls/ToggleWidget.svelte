@@ -31,43 +31,43 @@
 
 <style>
     button {
-        height: var(--gg-components-buttonHeight);
+        height: var(--ju-components-buttonHeight);
         font-size: 16px;
         padding: 1px 3px;
 
         outline: none;
         margin: 0;
         border-width: 1px;
-        border-radius: var(--gg-components-radiusSm);
-        border-color: var(--gg-colors-outline);
-        box-shadow: var(--gg-shadows-shadowSm);
+        border-radius: var(--ju-components-radiusSm);
+        border-color: var(--ju-colors-outline);
+        box-shadow: var(--ju-shadows-shadowSm);
 
-        background: var(--gg-colors-success);
+        background: var(--ju-colors-success);
         color: black;
 
-        font-family: var(--gg-text-familyUi);
+        font-family: var(--ju-text-familyUi);
         display: flex;
         align-items: center;
 
         cursor: pointer;
-        transition: background var(--gg-components-transitionFast), box-shadow var(--gg-components-transitionFast), transform var(--gg-components-transitionFast);
+        transition: background var(--ju-components-transitionFast), box-shadow var(--ju-components-transitionFast), transform var(--ju-components-transitionFast);
     }
 
     button:not(:disabled) {
         &:hover {
-            background: var(--gg-colors-success);
-            box-shadow: var(--gg-shadows-shadowMd);
+            background: var(--ju-colors-success);
+            box-shadow: var(--ju-shadows-shadowMd);
         }
         &:focus-visible {
-            border-color: var(--gg-colors-focusRing);
+            border-color: var(--ju-colors-focusRing);
             border-width: 2px;
             padding: 0px 2px;
             text-decoration: underline;
         }
         &:active {
             margin: var(--active-margin);
-            transform: var(--gg-components-buttonActiveTransform);
-            box-shadow: var(--gg-components-buttonActiveShadow);
+            transform: var(--ju-components-buttonActiveTransform);
+            box-shadow: var(--ju-components-buttonActiveShadow);
             &:focus-visible {
                 padding: 1px 1px 0px 2px;
             }
@@ -76,22 +76,22 @@
 
     button.checked:not(:disabled) {
         margin: var(--active-margin);
-        box-shadow: var(--gg-components-buttonActiveShadow);
-        background: var(--gg-colors-error);
+        box-shadow: var(--ju-components-buttonActiveShadow);
+        background: var(--ju-colors-error);
         &:focus-visible {
             padding: 1px 1px 0px 2px;
         }
     }
 
     button.secondary {
-        background: var(--gg-colors-surfaceStrong);
+        background: var(--ju-colors-surfaceStrong);
         &:hover {
-            background: var(--gg-colors-foregroundSubtle);
+            background: var(--ju-colors-foregroundSubtle);
         }
     }
 
     button:disabled {
-        background: var(--gg-colors-surface);
-        color: var(--gg-colors-foregroundSubtle);
+        background: var(--ju-colors-surface);
+        color: var(--ju-colors-foregroundSubtle);
     }
 </style>

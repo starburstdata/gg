@@ -14,7 +14,7 @@ pub fn received_event() -> bool {
 }
 
 pub fn init() -> TauriPlugin<Wry> {
-    Builder::new("gg-recent-items")
+    Builder::new("jjuicy-recent-items")
         .on_event(|app, event| {
             if let RunEvent::Opened { urls } = event {
                 // track deep-links so main setup can avoid opening an extra window

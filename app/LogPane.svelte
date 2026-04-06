@@ -488,21 +488,21 @@
     }
 
     .delete {
-        color: var(--gg-colors-error);
+        color: var(--ju-colors-error);
     }
 
      /* override some ListWidget styles */
     .title {
-        font-family: var(--gg-text-familyUi);
+        font-family: var(--ju-text-familyUi);
         font-size: 0.8em;
         font-weight: 600;
         text-transform: uppercase;
-        color: var(--gg-colors-foregroundSubtle);
+        color: var(--ju-colors-foregroundSubtle);
         padding: 2px 3px;
     }
 
     input {
-        font-family: var(--gg-text-familyCode);
+        font-family: var(--ju-text-familyCode);
         font-size: 14px;
         width: 100%;
         box-sizing: border-box;

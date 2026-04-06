@@ -51,15 +51,15 @@
     button {
         background: none;
         border: none;
-        color: var(--gg-colors-primary);
+        color: var(--ju-colors-primary);
         cursor: pointer;
         text-decoration: none;
-        font-family: var(--gg-text-familyCode);
+        font-family: var(--ju-text-familyCode);
         font-size: 18px;
         padding: 0;
 
         &:hover {
-            color: var(--gg-colors-primaryHover);
+            color: var(--ju-colors-primaryHover);
             text-decoration: underline;
         }
     }

@@ -19,24 +19,24 @@
 <style>
     .id {
         pointer-events: none;
-        color: var(--gg-colors-foregroundMuted);
-        font-family: var(--gg-text-familyCode);
+        color: var(--ju-colors-foregroundMuted);
+        font-family: var(--ju-text-familyCode);
     }
 
     .commit {
-        color: var(--gg-colors-accent);
+        color: var(--ju-colors-accent);
     }
 
     .change {
-        color: var(--gg-colors-accent);
+        color: var(--ju-colors-accent);
     }
 
     .hidden {
-        color: var(--gg-colors-foreground);
+        color: var(--ju-colors-foreground);
     }
 
     .divergent {
-        color: var(--gg-colors-error);
+        color: var(--ju-colors-error);
     }
 
     .pronoun {
