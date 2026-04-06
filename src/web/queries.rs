@@ -127,7 +127,7 @@ async fn query_recent_workspaces(
     let (tx, rx) = channel();
     state.worker_tx.send(SessionEvent::ReadConfigArray {
         tx,
-        key: vec!["gg".into(), "ui".into(), "recent-workspaces".into()],
+        key: vec!["jjuicy".into(), "ui".into(), "recent-workspaces".into()],
     })?;
     let result = rx.recv()?.unwrap_or_default();
     Ok(Json(result))

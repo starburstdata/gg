@@ -98,8 +98,8 @@
     #status-bar {
         grid-area: footer;
         padding: 0 6px;
-        font-family: var(--gg-text-familyUi);
-        font-size: var(--gg-text-sizeMd);
+        font-family: var(--ju-text-familyUi);
+        font-size: var(--ju-text-sizeMd);
         gap: 6px;
         align-items: center;
     }
@@ -141,12 +141,12 @@
     }
 
     .target {
-        background: var(--gg-colors-accent);
+        background: var(--ju-colors-accent);
         color: black;
     }
 
     .maybe {
         background: transparent;
-        color: var(--gg-colors-highlight);
+        color: var(--ju-colors-highlight);
     }
 </style>

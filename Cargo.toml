@@ -1,17 +1,17 @@
 [package]
-name = "gg-cli"
-version = "0.39.1"
-description = "GG - Gui for JJ"
-authors = ["Thomas Castiglione"]
+name = "jjuicy-cli"
+version = "1.0.0"
+description = "jjuicy - a UI for Jujutsu"
+authors = ["Thomas Castiglione", "Lakshmikant Shrinivas", "Martin Traverso"]
 edition = "2024"
 license = "Apache-2.0"
-repository = "https://github.com/gulbanana/gg"
-homepage = "https://github.com/gulbanana/gg"
+repository = "https://github.com/starburstdata/gg"
+homepage = "https://github.com/starburstdata/gg"
 keywords = ["jujutsu", "jj", "vcs", "scm", "gui"]
 categories = ["development-tools"]
 include = [
     "/dist/**/*",
-    "/res/hallucination.png",
+    "/res/logo.png",
     "/res/icons/*",
     "/src/**/*",
     "/build.rs",
@@ -25,11 +25,11 @@ include = [
 pre-release-hook = ["npm", "run", "build"]
 
 [lib]
-name = "gg_lib"
+name = "jjuicy_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "gg"
+name = "ju"
 path = "src/main.rs"
 
 # custom-protocol is magic - tauri build adds it, tauri dev removes. it's on by default so that cargo run works

@@ -17,14 +17,14 @@
         flex-direction: column;
         height: 100%;
         overflow: hidden;
-        background: var(--gg-colors-background);
+        background: var(--ju-colors-background);
     }
 
     .header {
-        border-bottom: var(--gg-components-borderSubtle);
-        font-family: var(--gg-text-familyUi);
+        border-bottom: var(--ju-components-borderSubtle);
+        font-family: var(--ju-text-familyUi);
         padding: 6px 6px 3px 6px;
-        background: var(--gg-colors-background);
+        background: var(--ju-colors-background);
     }
 
     .body {

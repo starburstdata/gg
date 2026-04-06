@@ -25,43 +25,43 @@
 
 <style>
     button {
-        height: var(--gg-components-buttonHeight);
+        height: var(--ju-components-buttonHeight);
         font-size: 14px;
-        padding: var(--gg-components-buttonPadding);
+        padding: var(--ju-components-buttonPadding);
 
         outline: none;
         margin: 0;
-        border: var(--gg-components-buttonBorder);
-        border-radius: var(--gg-components-buttonRadius);
-        box-shadow: var(--gg-components-buttonShadow);
+        border: var(--ju-components-buttonBorder);
+        border-radius: var(--ju-components-buttonRadius);
+        box-shadow: var(--ju-components-buttonShadow);
 
-        font-family: var(--gg-text-familyUi);
+        font-family: var(--ju-text-familyUi);
         display: flex;
         align-items: center;
         gap: 3px;
 
         cursor: pointer;
-        transition: background var(--gg-components-transitionFast), box-shadow var(--gg-components-transitionFast), transform var(--gg-components-transitionFast);
+        transition: background var(--ju-components-transitionFast), box-shadow var(--ju-components-transitionFast), transform var(--ju-components-transitionFast);
 
-        color: var(--gg-components-buttonForeground);
-        background: var(--gg-components-buttonBackground);
+        color: var(--ju-components-buttonForeground);
+        background: var(--ju-components-buttonBackground);
     }
 
     button:not(:disabled) {
         &:hover {
-            background: var(--gg-components-buttonHoverBackground);
-            box-shadow: var(--gg-shadows-shadowMd);
+            background: var(--ju-components-buttonHoverBackground);
+            box-shadow: var(--ju-shadows-shadowMd);
         }
         &:focus-visible {
-            border-color: var(--gg-colors-focusRing);
+            border-color: var(--ju-colors-focusRing);
             border-width: 2px;
             padding: 0px 5px;
             text-decoration: underline;
         }
         &:active {
             margin: var(--active-margin);
-            transform: var(--gg-components-buttonActiveTransform);
-            box-shadow: var(--gg-components-buttonActiveShadow);
+            transform: var(--ju-components-buttonActiveTransform);
+            box-shadow: var(--ju-components-buttonActiveShadow);
             &:focus-visible {
                 padding: 1px 4px 0px 5px;
             }
@@ -69,23 +69,23 @@
     }
 
     button.primary {
-        color: var(--gg-colors-primaryContent);
-        background: var(--gg-colors-primary);
+        color: var(--ju-colors-primaryContent);
+        background: var(--ju-colors-primary);
         &:hover {
-            background: var(--gg-components-buttonHoverBackground);
+            background: var(--ju-components-buttonHoverBackground);
         }
     }
 
     button.secondary {
-        color: var(--gg-components-buttonSecondaryForeground);
-        background: var(--gg-components-buttonSecondaryBackground);
+        color: var(--ju-components-buttonSecondaryForeground);
+        background: var(--ju-components-buttonSecondaryBackground);
         &:hover {
-            background: var(--gg-components-buttonSecondaryHoverBackground);
+            background: var(--ju-components-buttonSecondaryHoverBackground);
         }
     }
 
     button:disabled {
-        background: var(--gg-components-buttonDisabledBackground);
-        color: var(--gg-components-buttonDisabledForeground);
+        background: var(--ju-components-buttonDisabledBackground);
+        color: var(--ju-components-buttonDisabledForeground);
     }
 </style>

@@ -1,4 +1,4 @@
-# GG macOS Theme — Apple HIG-inspired
+# jjuicy macOS Theme — Apple HIG-inspired
 
 [light.colors]
 background = "#ffffff"
@@ -126,7 +126,7 @@ borderDialog = "1px solid $colors.surfaceStrong"
 separatorWidth = "1px"
 
 headerHeight = "44px"
-toolbarHeight = "38px"
+toolbarHeight = "48px"
 
 surfacePadding = "8px"
 surfacePaddingLg = "16px"
@@ -265,7 +265,7 @@ borderDialog = "1px solid $colors.surfaceStrong"
 separatorWidth = "1px"
 
 headerHeight = "44px"
-toolbarHeight = "38px"
+toolbarHeight = "48px"
 
 surfacePadding = "8px"
 surfacePaddingLg = "16px"

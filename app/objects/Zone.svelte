@@ -88,6 +88,6 @@ A drop target for direct-manipulation objects.
     }
 
     .hint {
-        color: var(--gg-colors-highlight);
+        color: var(--ju-colors-highlight);
     }
 </style>

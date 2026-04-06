@@ -37,12 +37,12 @@
     .hunk {
         margin: 0;
         text-align: center;
-        background: var(--gg-colors-surface);
+        background: var(--ju-colors-surface);
         padding: 4px;
     }
 
     .target {
         color: black;
-        background: var(--gg-colors-accent);
+        background: var(--ju-colors-accent);
     }
 </style>

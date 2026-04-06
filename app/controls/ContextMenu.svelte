@@ -190,15 +190,15 @@
     .context-menu {
         position: fixed;
         z-index: 1000;
-        background: var(--gg-colors-surface);
-        border: 1px solid var(--gg-colors-outline);
+        background: var(--ju-colors-surface);
+        border: 1px solid var(--ju-colors-outline);
         border-radius: 3px;
-        box-shadow: 2px 2px var(--gg-colors-foreground);
+        box-shadow: 2px 2px var(--ju-colors-foreground);
     }
 
     hr {
         border: none;
-        border-top: 1px solid var(--gg-colors-outline);
+        border-top: 1px solid var(--ju-colors-outline);
         margin: 2px 0;
     }
 
@@ -210,18 +210,18 @@
 
         text-align: left;
         background: none;
-        color: var(--gg-colors-foreground);
-        font-family: var(--gg-text-familyDisplay);
+        color: var(--ju-colors-foreground);
+        font-family: var(--ju-text-familyDisplay);
 
         &:disabled {
-            color: var(--gg-colors-outline);
+            color: var(--ju-colors-outline);
         }
 
         &:not(:disabled) {
             cursor: pointer;
             &:hover {
-                background: var(--gg-colors-selectionBackground);
-                color: var(--gg-colors-selectionForeground);
+                background: var(--ju-colors-selectionBackground);
+                color: var(--ju-colors-selectionForeground);
             }
         }
     }

@@ -45,10 +45,10 @@
 
         grid-area: 2/2/2/2;
 
-        background: var(--gg-colors-background);
-        border-radius: var(--gg-components-radiusLg);
-        border: var(--gg-components-borderDialog);
-        box-shadow: var(--gg-shadows-shadowLg);
+        background: var(--ju-colors-background);
+        border-radius: var(--ju-components-radiusLg);
+        border: var(--ju-components-borderDialog);
+        box-shadow: var(--ju-shadows-shadowLg);
         padding: var(--modal-padding);
 
         display: grid;
@@ -61,7 +61,7 @@
     }
 
     #dialog-header {
-        font-family: var(--gg-text-familyUi);
+        font-family: var(--ju-text-familyUi);
         grid-area: header;
         display: flex;
         align-items: center;
@@ -86,7 +86,7 @@
         height: 30px;
         min-width: 30px;
 
-        font-family: var(--gg-text-familyUi);
+        font-family: var(--ju-text-familyUi);
         font-size: 14px;
     }
     #dialog-content :global(select),
@@ -110,6 +110,6 @@
     }
 
     .error {
-        color: var(--gg-colors-error);
+        color: var(--ju-colors-error);
     }
 </style>

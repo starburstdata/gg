@@ -100,7 +100,7 @@
         align-items: center;
         gap: 3px;
         padding-left: 3px;
-        border-bottom: 1px solid var(--gg-colors-surface);
+        border-bottom: 1px solid var(--ju-colors-surface);
     }
 
     .path-prefix {
@@ -121,11 +121,11 @@
         align-items: center;
         flex: none;
         transition: transform 150ms ease;
-        color: var(--gg-colors-foregroundSubtle);
+        color: var(--ju-colors-foregroundSubtle);
     }
 
     :global(.selected) .chevron {
-        color: var(--gg-colors-selectionForeground);
+        color: var(--ju-colors-selectionForeground);
     }
 
     .chevron.expanded {
@@ -133,7 +133,7 @@
     }
 
     .layout.target {
-        background: var(--gg-colors-accent);
-        color: var(--gg-colors-foreground);
+        background: var(--ju-colors-accent);
+        color: var(--ju-colors-foreground);
     }
 </style>

@@ -111,8 +111,8 @@
 
 <style>
     svg {
-        stroke: var(--gg-colors-foreground);
-        fill: var(--gg-colors-foreground);
+        stroke: var(--ju-colors-foreground);
+        fill: var(--ju-colors-foreground);
         overflow: hidden;
     }
 

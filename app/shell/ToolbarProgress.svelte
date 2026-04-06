@@ -40,8 +40,8 @@
     }
 
     .label {
-        font-size: var(--gg-text-sizeMd);
-        color: var(--gg-colors-foregroundMuted);
+        font-size: var(--ju-text-sizeMd);
+        color: var(--ju-colors-foregroundMuted);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -51,14 +51,14 @@
     .bar-track {
         width: 100%;
         height: 3px;
-        background: var(--gg-colors-surfaceStrong);
+        background: var(--ju-colors-surfaceStrong);
         border-radius: 1.5px;
         overflow: hidden;
     }
 
     .bar-fill {
         height: 100%;
-        background: var(--gg-colors-primary);
+        background: var(--ju-colors-primary);
         border-radius: 1.5px;
         transition: width 0.2s ease;
     }

@@ -54,7 +54,7 @@ use thiserror::Error;
 use super::{WorkerSession, git_util::get_git_remote_names};
 
 use crate::{
-    config::{GGSettings, read_config},
+    config::{JjuicySettings, read_config},
     messages::{self, *},
 };
 

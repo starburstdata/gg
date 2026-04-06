@@ -1,10 +1,10 @@
-//! GG-specific configuration, loaded on top of jj's standard config layers.
+//! jjuicy-specific configuration, loaded on top of jj's standard config layers.
 //!
-//! All GG settings live under the `[gg]` table in jj config. Keys that don't
-//! match a known GG setting are treated as jj overrides — for example,
-//! `gg.user.name = "bar"` overrides `user.name` only within GG.
+//! All jjuicy settings live under the `[jjuicy]` table in jj config. Keys that don't
+//! match a known jjuicy setting are treated as jj overrides — for example,
+//! `jjuicy.user.name = "bar"` overrides `user.name` only within jjuicy.
 //!
-//! Use [`read_config`] to load the merged configuration, and [`GGSettings`]
+//! Use [`read_config`] to load the merged configuration, and [`JjuicySettings`]
 //! to access individual values with their defaults.
 
 #[cfg(all(test, not(feature = "ts-rs")))]
@@ -24,13 +24,13 @@ use jj_lib::{
     settings::UserSettings,
 };
 
-/// Typed accessors for GG's `[gg.*]` config keys.
+/// Typed accessors for jjuicy's `[jjuicy.*]` config keys.
 ///
-/// Implemented on [`UserSettings`] so callers can read GG settings from the
+/// Implemented on [`UserSettings`] so callers can read jjuicy settings from the
 /// same object used for jj settings. Each method falls back to a sensible
-/// default when the key is absent. See `config/gg.toml` for the full list of
+/// default when the key is absent. See `config/jjuicy.toml` for the full list of
 /// keys and their defaults.
-pub trait GGSettings {
+pub trait JjuicySettings {
     fn query_log_page_size(&self) -> usize;
     fn query_large_repo_heuristic(&self) -> i64;
     fn query_auto_snapshot(&self) -> Option<bool>;
@@ -45,46 +45,47 @@ pub trait GGSettings {
     fn web_launch_browser(&self) -> bool;
 }
 
-impl GGSettings for UserSettings {
+impl JjuicySettings for UserSettings {
     fn query_log_page_size(&self) -> usize {
-        self.get_int("gg.queries.log-page-size").unwrap_or(1000) as usize
+        self.get_int("jjuicy.queries.log-page-size").unwrap_or(1000) as usize
     }
 
     fn query_large_repo_heuristic(&self) -> i64 {
-        self.get_int("gg.queries.large-repo-heuristic")
+        self.get_int("jjuicy.queries.large-repo-heuristic")
             .unwrap_or(100000)
     }
 
     fn query_auto_snapshot(&self) -> Option<bool> {
-        self.get_bool("gg.queries.auto-snapshot").ok()
+        self.get_bool("jjuicy.queries.auto-snapshot").ok()
     }
 
     fn ui_theme_override(&self) -> Option<String> {
-        self.get_string("gg.ui.theme-override")
+        self.get_string("jjuicy.ui.theme-override")
             .ok()
             .filter(|s| !s.is_empty())
     }
 
     fn ui_theme_file(&self) -> Option<String> {
-        self.get_string("gg.ui.theme-file")
+        self.get_string("jjuicy.ui.theme-file")
             .ok()
             .filter(|s| !s.is_empty())
     }
 
     fn ui_mark_unpushed_bookmarks(&self) -> bool {
-        self.get_bool("gg.ui.mark-unpushed-bookmarks").unwrap_or(
-            self.get_bool("gg.ui.mark-unpushed-branches")
-                .unwrap_or(true),
-        )
+        self.get_bool("jjuicy.ui.mark-unpushed-bookmarks")
+            .unwrap_or(
+                self.get_bool("jjuicy.ui.mark-unpushed-branches")
+                    .unwrap_or(true),
+            )
     }
 
     fn ui_track_recent_workspaces(&self) -> bool {
-        self.get_bool("gg.ui.track-recent-workspaces")
+        self.get_bool("jjuicy.ui.track-recent-workspaces")
             .unwrap_or(true)
     }
 
     fn ui_recent_workspaces(&self) -> Vec<String> {
-        self.get_value("gg.ui.recent-workspaces")
+        self.get_value("jjuicy.ui.recent-workspaces")
             .ok()
             .and_then(|v| v.as_array().cloned())
             .map(|values| {
@@ -97,25 +98,25 @@ impl GGSettings for UserSettings {
     }
 
     fn web_default_port(&self) -> u16 {
-        self.get_int("gg.web.default-port").unwrap_or(0) as u16
+        self.get_int("jjuicy.web.default-port").unwrap_or(0) as u16
     }
 
     fn web_client_timeout(&self) -> Duration {
-        self.get_string("gg.web.client-timeout")
+        self.get_string("jjuicy.web.client-timeout")
             .ok()
             .and_then(|s| humantime::parse_duration(&s).ok())
             .unwrap_or(Duration::from_secs(600))
     }
 
     fn web_launch_browser(&self) -> bool {
-        self.get_bool("gg.web.launch-browser").unwrap_or(true)
+        self.get_bool("jjuicy.web.launch-browser").unwrap_or(true)
     }
 }
 
-/// Native GG keys that have dynamic defaults and can't appear in gg.toml.
+/// Native jjuicy keys that have dynamic defaults and can't appear in jjuicy.toml.
 const EXTRA_NATIVE_KEYS: &[&str] = &["queries.auto-snapshot", "ui.mark-unpushed-branches"];
 
-/// Collect all leaf key paths from gg.toml under `[gg]` to identify native GG settings.
+/// Collect all leaf key paths from jjuicy.toml under `[jjuicy]` to identify native jjuicy settings.
 fn native_keys() -> HashSet<String> {
     fn collect_leaves(table: &toml_edit::Table, prefix: &str, keys: &mut HashSet<String>) {
         for (key, item) in table.iter() {
@@ -132,12 +133,12 @@ fn native_keys() -> HashSet<String> {
         }
     }
 
-    let doc: toml_edit::DocumentMut = include_str!("../config/gg.toml")
+    let doc: toml_edit::DocumentMut = include_str!("jjuicy.toml")
         .parse()
-        .expect("bundled gg.toml is valid TOML");
+        .expect("bundled jjuicy.toml is valid TOML");
     let mut keys = HashSet::new();
-    if let Some(gg) = doc.get("gg").and_then(|v| v.as_table()) {
-        collect_leaves(gg, "", &mut keys);
+    if let Some(table) = doc.get("jjuicy").and_then(|v| v.as_table()) {
+        collect_leaves(table, "", &mut keys);
     }
     for extra in EXTRA_NATIVE_KEYS {
         keys.insert(extra.to_string());
@@ -145,11 +146,11 @@ fn native_keys() -> HashSet<String> {
     keys
 }
 
-/// Load the merged jj + GG configuration.
+/// Load the merged jj + jjuicy configuration.
 ///
-/// Layers (low → high priority): jj defaults, bundled `gg.toml` defaults,
+/// Layers (low → high priority): jj defaults, bundled `jjuicy.toml` defaults,
 /// user config, and (when `repo_path` is `Some`) repo-level config. Any
-/// non-native `gg.*` keys are extracted as jj overrides (see module docs).
+/// non-native `jjuicy.*` keys are extracted as jj overrides (see module docs).
 ///
 /// Returns `(settings, revset_aliases, preset_query_choices)`.
 pub fn read_config(
@@ -164,7 +165,7 @@ pub fn read_config(
     let mut config_env = ConfigEnv::from_environment();
 
     let default_layers = default_config_layers();
-    let gg_layer = ConfigLayer::parse(ConfigSource::Default, include_str!("../config/gg.toml"))?;
+    let gg_layer = ConfigLayer::parse(ConfigSource::Default, include_str!("jjuicy.toml"))?;
     layers.extend(default_layers);
     layers.push(gg_layer);
 
@@ -196,12 +197,12 @@ pub fn read_config(
     ))
 }
 
-/// Scans all config layers for `gg.*` keys that aren't GG's own settings and
-/// collects them into a high-priority layer with the `gg.` prefix stripped.
-/// This lets users write `gg.user.name = "bar"` to override `user.name` only
-/// within GG, without affecting the jj CLI.
+/// Scans all config layers for `jjuicy.*` keys that aren't jjuicy's own settings and
+/// collects them into a high-priority layer with the `jjuicy.` prefix stripped.
+/// This lets users write `jjuicy.user.name = "bar"` to override `user.name` only
+/// within jjuicy, without affecting the jj CLI.
 fn extract_overrides(config: &StackedConfig) -> Option<ConfigLayer> {
-    let gg_table_name = ConfigNamePathBuf::from_iter(["gg"]);
+    let gg_table_name = ConfigNamePathBuf::from_iter(["jjuicy"]);
     let native_keys = native_keys();
     let mut doc = toml_edit::DocumentMut::new();
     let mut has_overrides = false;
@@ -224,7 +225,7 @@ fn extract_overrides(config: &StackedConfig) -> Option<ConfigLayer> {
     has_overrides.then(|| ConfigLayer::with_data(ConfigSource::CommandArg, doc))
 }
 
-/// Recursively walk a table under `gg`, classifying each leaf as native or override.
+/// Recursively walk a table under `jjuicy`, classifying each leaf as native or override.
 fn collect_override_entries(
     table: &dyn toml_edit::TableLike,
     prefix: &mut String,
@@ -250,7 +251,7 @@ fn collect_override_entries(
     }
 }
 
-/// Returns true if a key path (relative to `gg.`) is a native GG setting.
+/// Returns true if a key path (relative to `jjuicy.`) is a native jjuicy setting.
 fn is_native_key(path: &str, native_keys: &HashSet<String>) -> bool {
     path.starts_with("presets.") || native_keys.contains(path)
 }
@@ -272,7 +273,7 @@ fn set_in_doc(doc: &mut toml_edit::DocumentMut, path: &str, item: &toml_edit::It
 }
 
 fn read_preset_choices(stacked_config: &StackedConfig) -> HashMap<String, String> {
-    let table_name = ConfigNamePathBuf::from_iter(["gg", "presets"]);
+    let table_name = ConfigNamePathBuf::from_iter(["jjuicy", "presets"]);
     let mut choices = HashMap::new();
 
     for layer in stacked_config.layers() {

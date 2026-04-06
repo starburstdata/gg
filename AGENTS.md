@@ -1,6 +1,6 @@
 # Project Overview
 
-GG is a GUI for Jujutsu (jj) version control. It's a Tauri desktop app with Svelte/TypeScript frontend (`app/`) and Rust backend (`src/`). Two launch modes: native GUI (`gg gui`) and browser-based web mode (`gg web`).
+jjuicy is a GUI for Jujutsu (jj) version control. It's a Tauri desktop app with Svelte/TypeScript frontend (`app/`) and Rust backend (`src/`). Two launch modes: native GUI (`ju gui`) and browser-based web mode (`ju web`).
 
 ## Development Commands
 
@@ -115,10 +115,10 @@ Use macros from `src/gui/handler.rs`:
 
 ## Configuration
 
-Settings loaded via `jj config`. Key GG-specific settings in `src/config/gg.toml`:
-- `gg.default-mode` - "gui" or "web"
-- `gg.queries.log-page-size` - paging size (default 1000)
-- `gg.queries.large-repo-heuristic` - disables features when repo too large (default 100k)
+Settings loaded via `jj config`. Key jjuicy-specific settings in `src/config/jjuicy.toml`:
+- `jjuicy.default-mode` - "gui" or "web"
+- `jjuicy.queries.log-page-size` - paging size (default 1000)
+- `jjuicy.queries.large-repo-heuristic` - disables features when repo too large (default 100k)
 
 ## Comment Style
 
@@ -157,4 +157,4 @@ Use `let` instead of `const` for variable declarations.
 - `app/mutators/BinaryMutator.ts` - All drag-drop policies
 - `app/ipc.ts` - IPC abstraction with runtime detection
 - `src/worker/mutations.rs` - All mutation implementations
-- `src/config/gg.toml` - Default configuration with inline docs
+- `src/config/jjuicy.toml` - Default configuration with inline docs

@@ -176,7 +176,7 @@
 <style>
     path {
         pointer-events: none;
-        stroke: var(--gg-colors-primary);
+        stroke: var(--ju-colors-primary);
     }
 
     foreignObject > :global(*) {
@@ -190,6 +190,6 @@
 
     .target {
         stroke: black;
-        background-color: var(--gg-colors-accent);
+        background-color: var(--ju-colors-accent);
     }
 </style>

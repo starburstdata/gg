@@ -9,7 +9,7 @@
 
 <style>
     .author {
-        color: var(--gg-colors-foregroundMuted);
+        color: var(--ju-colors-foregroundMuted);
         white-space: nowrap;
         pointer-events: auto;
     }

@@ -10,30 +10,30 @@
 }
 
 ::selection {
-  background-color: var(--gg-colors-selectionBackground);
-  color: var(--gg-colors-selectionForeground);
+  background-color: var(--ju-colors-selectionBackground);
+  color: var(--ju-colors-selectionForeground);
 }
 
 textarea,
 select,
 input {
   outline: none;
-  border: var(--gg-components-borderSubtle);
-  border-radius: var(--gg-components-inputRadius);
-  padding: var(--gg-components-inputPadding);
-  transition: border-color var(--gg-components-transitionFast), box-shadow var(--gg-components-transitionFast);
+  border: var(--ju-components-borderSubtle);
+  border-radius: var(--ju-components-inputRadius);
+  padding: var(--ju-components-inputPadding);
+  transition: border-color var(--ju-components-transitionFast), box-shadow var(--ju-components-transitionFast);
 
   &:focus-visible {
-    border-color: var(--gg-colors-focusRing);
+    border-color: var(--ju-colors-focusRing);
     border-width: 2px;
-    padding: calc(var(--gg-components-inputPadding) - 1px);
+    padding: calc(var(--ju-components-inputPadding) - 1px);
   }
 
-  caret-color: var(--gg-colors-focusRing);
+  caret-color: var(--ju-colors-focusRing);
 
-  background-color: var(--gg-colors-background);
-  color: var(--gg-colors-foreground);
-  scrollbar-color: var(--gg-colors-foreground) var(--gg-colors-background);
+  background-color: var(--ju-colors-background);
+  color: var(--ju-colors-foreground);
+  scrollbar-color: var(--ju-colors-foreground) var(--ju-colors-background);
 
   &:disabled {
     background-color: transparent;
@@ -44,33 +44,33 @@ input {
   }
 
   &::-webkit-scrollbar-thumb {
-    background-color: var(--gg-colors-foreground);
+    background-color: var(--ju-colors-foreground);
     border-radius: 6px;
   }
 
   &::-webkit-scrollbar-track {
-    background-color: var(--gg-colors-background);
+    background-color: var(--ju-colors-background);
   }
 }
 
 textarea {
-  font-family: var(--gg-text-familyCode);
+  font-family: var(--ju-text-familyCode);
 }
 
 pre, code {
-  font-family: var(--gg-text-familyCode);
-  font-size: var(--gg-text-sizeMd);
+  font-family: var(--ju-text-familyCode);
+  font-size: var(--ju-text-sizeMd);
 }
 
 @supports (appearance: base-select) {
   ::picker(select) {
     outline: none;
-    border: var(--gg-components-borderSubtle);
-    border-radius: var(--gg-components-inputRadius);
+    border: var(--ju-components-borderSubtle);
+    border-radius: var(--ju-components-inputRadius);
     padding: 1px;
 
-    background-color: var(--gg-colors-background);
-    color: var(--gg-colors-foreground);
+    background-color: var(--ju-colors-background);
+    color: var(--ju-colors-foreground);
   }
 }
 

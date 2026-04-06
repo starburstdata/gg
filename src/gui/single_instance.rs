@@ -1,6 +1,6 @@
 //! Single-instance coordination.
 //!
-//! When `gg` is invoked from the CLI, it first tries to connect to a running
+//! When `ju` is invoked from the CLI, it first tries to connect to a running
 //! GUI instance over a local socket and ask it to open the requested workspace.
 //! If that succeeds, the CLI exits without spawning a new process. Otherwise
 //! startup proceeds as normal and the new instance binds the socket itself.
@@ -61,9 +61,9 @@ fn socket_path() -> PathBuf {
     let suffix = format!("{:08x}", hasher.finish() as u32);
 
     if cfg!(windows) {
-        PathBuf::from(format!(r"\\.\pipe\gg-ui-{}", suffix))
+        PathBuf::from(format!(r"\\.\pipe\jjuicy-ui-{}", suffix))
     } else {
-        env::temp_dir().join(format!("gg-ui-{}.sock", suffix))
+        env::temp_dir().join(format!("jjuicy-ui-{}.sock", suffix))
     }
 }
 
@@ -113,7 +113,10 @@ fn bind(path: &Path) -> Result<Listener> {
         Err(e) if e.kind() == ErrorKind::AddrInUse => {
             // probe for a live listener on the existing socket
             if Stream::connect(to_name(path)?).is_ok() {
-                return Err(anyhow!("another gg instance is listening on {:?}", path));
+                return Err(anyhow!(
+                    "another jjuicy instance is listening on {:?}",
+                    path
+                ));
             }
             // stale: unlink and retry
             #[cfg(unix)]
