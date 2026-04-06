@@ -23,8 +23,8 @@
         bottom: 33px;
         left: 0;
 
-        background: var(--gg-colors-overlayBackground);
-        backdrop-filter: blur(var(--gg-colors-overlayBackdropBlur));
+        background: var(--ju-colors-overlayBackground);
+        backdrop-filter: blur(var(--ju-colors-overlayBackdropBlur));
         pointer-events: auto;
 
         display: grid;

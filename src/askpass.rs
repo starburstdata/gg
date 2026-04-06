@@ -1,15 +1,15 @@
 //! Credential relay for git/ssh operations.
 //!
 //! Git and SSH support delegating credential prompts to an external program via
-//! `GIT_ASKPASS` / `SSH_ASKPASS`. GG uses this by setting those variables to point
+//! `GIT_ASKPASS` / `SSH_ASKPASS`. jjuicy uses this by setting those variables to point
 //! at its own binary, then communicating over a local socket so the main process
 //! can supply (or record) credentials without a terminal.
 //!
 //! Flow:
 //! 1. Worker operations spin up a named-pipe/unix-socket listener and set env
 //!    vars so that git/ssh will invoke the current binary as the askpass program.
-//! 2. Git spawns `gg` (or your binary) with the prompt as `argv[1]``. [`run_askpass`]
-//!    detects `GG_ASKPASS_SOCKET`, enters client mode, and forwards the prompt via IPC.
+//! 2. Git spawns `ju` (or your binary) with the prompt as `argv[1]``. [`run_askpass`]
+//!    detects `JJUICY_ASKPASS_SOCKET`, enters client mode, and forwards the prompt via IPC.
 //! 3. The server replies `OK:<credential>` or `NO`, and the client prints to stdout
 //!    (which git reads) or exits non-zero.
 use crate::messages::InputResponse;
@@ -49,13 +49,13 @@ impl Drop for AskpassThread {
     }
 }
 
-/// Entry point when `gg` is re-invoked as an askpass helper by git/ssh.
+/// Entry point when `ju` is re-invoked as an askpass helper by git/ssh.
 ///
-/// Returns `Some` if `GG_ASKPASS_SOCKET` is set (i.e. we were spawned as a
+/// Returns `Some` if `JJUICY_ASKPASS_SOCKET` is set (i.e. we were spawned as a
 /// credential helper), `None` otherwise so the caller can continue with
 /// normal startup.
 pub fn run_askpass() -> Option<Result<()>> {
-    let socket_path = env::var("GG_ASKPASS_SOCKET").ok()?;
+    let socket_path = env::var("JJUICY_ASKPASS_SOCKET").ok()?;
     Some(askpass_client(socket_path).context("askpass_client"))
 }
 
@@ -72,7 +72,7 @@ pub(crate) fn serve_askpass(
     let stop_flag = Arc::new(AtomicBool::new(false));
 
     // socket for the askpass process to call back into this process
-    let socket_name = format!("gg-askpass-{}", Uuid::new_v4());
+    let socket_name = format!("ju-askpass-{}", Uuid::new_v4());
     let socket_path = if cfg!(windows) {
         PathBuf::from(format!(r"\\.\pipe\{}", socket_name))
     } else {
@@ -110,7 +110,7 @@ pub(crate) fn serve_askpass(
         }
     };
 
-    // if we did manage to start a server, specify environment variables which cause git to invoke gg as a client
+    // if we did manage to start a server, specify environment variables which cause git to invoke ju as a client
     let environment = if handle.is_some()
         && let Ok(exe_path) = env::current_exe()
     {
@@ -119,7 +119,7 @@ pub(crate) fn serve_askpass(
             ("GIT_TERMINAL_PROMPT".into(), "0".into()),
             ("SSH_ASKPASS".into(), exe_path.into()),
             ("SSH_ASKPASS_REQUIRE".into(), "force".into()),
-            ("GG_ASKPASS_SOCKET".into(), socket_path.into()),
+            ("JJUICY_ASKPASS_SOCKET".into(), socket_path.into()),
         ])
     } else {
         HashMap::new()

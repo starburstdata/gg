@@ -358,7 +358,7 @@ async fn config_read() -> Result<()> {
     })?;
     tx.send(SessionEvent::ReadConfigArray {
         tx: tx_read,
-        key: vec!["gg".into(), "ui".into(), "recent-workspaces".into()],
+        key: vec!["jjuicy".into(), "ui".into(), "recent-workspaces".into()],
     })?;
     tx.send(SessionEvent::EndSession)?;
 
@@ -386,12 +386,12 @@ async fn config_write() -> Result<()> {
     })?;
     tx.send(SessionEvent::WriteConfigArray {
         scope: ConfigSource::Repo,
-        key: vec!["gg".into(), "test".into()],
+        key: vec!["jjuicy".into(), "test".into()],
         values: vec!["a".into(), "b".into()],
     })?;
     tx.send(SessionEvent::ReadConfigArray {
         tx: tx_read,
-        key: vec!["gg".into(), "test".into()],
+        key: vec!["jjuicy".into(), "test".into()],
     })?;
     tx.send(SessionEvent::EndSession)?;
 
@@ -423,7 +423,7 @@ async fn config_write_table() -> Result<()> {
     })?;
     tx.send(SessionEvent::WriteConfigTable {
         scope: ConfigSource::Repo,
-        key: vec!["gg".into(), "presets".into()],
+        key: vec!["jjuicy".into(), "presets".into()],
         values,
     })?;
     tx.send(SessionEvent::OpenWorkspace {

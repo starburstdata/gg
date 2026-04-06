@@ -158,10 +158,10 @@ export function getInput<const T extends string>(title: string, detail: string, 
  * id should be injected by the server, but a random one is ok as long as it's consistent
  */
 function getClientId(): string {
-    if (!window.__GG_CLIENT_ID__) {
-        window.__GG_CLIENT_ID__ = crypto.randomUUID();
+    if (!window.__JJUICY_CLIENT_ID__) {
+        window.__JJUICY_CLIENT_ID__ = crypto.randomUUID();
     }
-    return window.__GG_CLIENT_ID__;
+    return window.__JJUICY_CLIENT_ID__;
 }
 
 /**

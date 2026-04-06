@@ -10,7 +10,7 @@ use tauri::{
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use super::{AppState, handler};
-use gg_lib::messages::{Operand, RepoEvent, RevHeader, StoreRef};
+use jjuicy_lib::messages::{Operand, RepoEvent, RevHeader, StoreRef};
 
 pub fn build_main(app_handle: &AppHandle, recent_items: &[String]) -> tauri::Result<Menu<Wry>> {
     #[cfg(target_os = "macos")]
@@ -19,7 +19,7 @@ pub fn build_main(app_handle: &AppHandle, recent_items: &[String]) -> tauri::Res
     let config = app_handle.config();
     #[cfg(target_os = "macos")]
     let about_metadata = AboutMetadata {
-        name: Some("GG".into()),
+        name: Some("jjuicy".into()),
         version: Some(pkg_info.version.to_string()),
         copyright: config.bundle.copyright.clone(),
         authors: config.bundle.publisher.clone().map(|p| vec![p]),
@@ -614,38 +614,48 @@ pub fn handle_event(window: &Window, event: MenuEvent) -> Result<()> {
         "menu_repo_clone" => repo_clone(window),
         "menu_repo_open" => repo_open(window),
         "menu_repo_reopen" => repo_reopen(window),
-        "menu_revision_new_child" => window.emit_to(target, "gg://menu/revision", "new_child")?,
-        "menu_revision_new_parent" => window.emit_to(target, "gg://menu/revision", "new_parent")?,
-        "menu_revision_edit" => window.emit_to(target, "gg://menu/revision", "edit")?,
-        "menu_revision_revert" => window.emit_to(target, "gg://menu/revision", "revert")?,
-        "menu_revision_duplicate" => window.emit_to(target, "gg://menu/revision", "duplicate")?,
-        "menu_revision_abandon" => window.emit_to(target, "gg://menu/revision", "abandon")?,
-        "menu_revision_squash" => window.emit_to(target, "gg://menu/revision", "squash")?,
-        "menu_revision_restore" => window.emit_to(target, "gg://menu/revision", "restore")?,
-        "menu_revision_bookmark" => window.emit_to(target, "gg://menu/revision", "bookmark")?,
-        "revision_new_child" => window.emit_to(target, "gg://context/revision", "new_child")?,
-        "revision_new_parent" => window.emit_to(target, "gg://context/revision", "new_parent")?,
-        "revision_edit" => window.emit_to(target, "gg://context/revision", "edit")?,
-        "revision_revert" => window.emit_to(target, "gg://context/revision", "revert")?,
-        "revision_duplicate" => window.emit_to(target, "gg://context/revision", "duplicate")?,
-        "revision_abandon" => window.emit_to(target, "gg://context/revision", "abandon")?,
-        "revision_squash" => window.emit_to(target, "gg://context/revision", "squash")?,
-        "revision_restore" => window.emit_to(target, "gg://context/revision", "restore")?,
-        "revision_bookmark" => window.emit_to(target, "gg://context/revision", "bookmark")?,
-        "tree_squash" => window.emit_to(target, "gg://context/tree", "squash")?,
-        "tree_restore" => window.emit_to(target, "gg://context/tree", "restore")?,
-        "bookmark_track" => window.emit_to(target, "gg://context/bookmark", "track")?,
-        "bookmark_untrack" => window.emit_to(target, "gg://context/bookmark", "untrack")?,
-        "bookmark_push_all" => window.emit_to(target, "gg://context/bookmark", "push-all")?,
-        "bookmark_push_single" => window.emit_to(target, "gg://context/bookmark", "push-single")?,
-        "bookmark_fetch_all" => window.emit_to(target, "gg://context/bookmark", "fetch-all")?,
-        "bookmark_fetch_single" => {
-            window.emit_to(target, "gg://context/bookmark", "fetch-single")?
+        "menu_revision_new_child" => {
+            window.emit_to(target, "jjuicy://menu/revision", "new_child")?
         }
-        "bookmark_rename" => window.emit_to(target, "gg://context/bookmark", "rename")?,
-        "bookmark_delete" => window.emit_to(target, "gg://context/bookmark", "delete")?,
-        "workspace_rename" => window.emit_to(target, "gg://context/workspace", "rename")?,
-        "workspace_forget" => window.emit_to(target, "gg://context/workspace", "forget")?,
+        "menu_revision_new_parent" => {
+            window.emit_to(target, "jjuicy://menu/revision", "new_parent")?
+        }
+        "menu_revision_edit" => window.emit_to(target, "jjuicy://menu/revision", "edit")?,
+        "menu_revision_revert" => window.emit_to(target, "jjuicy://menu/revision", "revert")?,
+        "menu_revision_duplicate" => {
+            window.emit_to(target, "jjuicy://menu/revision", "duplicate")?
+        }
+        "menu_revision_abandon" => window.emit_to(target, "jjuicy://menu/revision", "abandon")?,
+        "menu_revision_squash" => window.emit_to(target, "jjuicy://menu/revision", "squash")?,
+        "menu_revision_restore" => window.emit_to(target, "jjuicy://menu/revision", "restore")?,
+        "menu_revision_bookmark" => window.emit_to(target, "jjuicy://menu/revision", "bookmark")?,
+        "revision_new_child" => window.emit_to(target, "jjuicy://context/revision", "new_child")?,
+        "revision_new_parent" => {
+            window.emit_to(target, "jjuicy://context/revision", "new_parent")?
+        }
+        "revision_edit" => window.emit_to(target, "jjuicy://context/revision", "edit")?,
+        "revision_revert" => window.emit_to(target, "jjuicy://context/revision", "revert")?,
+        "revision_duplicate" => window.emit_to(target, "jjuicy://context/revision", "duplicate")?,
+        "revision_abandon" => window.emit_to(target, "jjuicy://context/revision", "abandon")?,
+        "revision_squash" => window.emit_to(target, "jjuicy://context/revision", "squash")?,
+        "revision_restore" => window.emit_to(target, "jjuicy://context/revision", "restore")?,
+        "revision_bookmark" => window.emit_to(target, "jjuicy://context/revision", "bookmark")?,
+        "tree_squash" => window.emit_to(target, "jjuicy://context/tree", "squash")?,
+        "tree_restore" => window.emit_to(target, "jjuicy://context/tree", "restore")?,
+        "bookmark_track" => window.emit_to(target, "jjuicy://context/bookmark", "track")?,
+        "bookmark_untrack" => window.emit_to(target, "jjuicy://context/bookmark", "untrack")?,
+        "bookmark_push_all" => window.emit_to(target, "jjuicy://context/bookmark", "push-all")?,
+        "bookmark_push_single" => {
+            window.emit_to(target, "jjuicy://context/bookmark", "push-single")?
+        }
+        "bookmark_fetch_all" => window.emit_to(target, "jjuicy://context/bookmark", "fetch-all")?,
+        "bookmark_fetch_single" => {
+            window.emit_to(target, "jjuicy://context/bookmark", "fetch-single")?
+        }
+        "bookmark_rename" => window.emit_to(target, "jjuicy://context/bookmark", "rename")?,
+        "bookmark_delete" => window.emit_to(target, "jjuicy://context/bookmark", "delete")?,
+        "workspace_rename" => window.emit_to(target, "jjuicy://context/workspace", "rename")?,
+        "workspace_forget" => window.emit_to(target, "jjuicy://context/workspace", "forget")?,
         recent_id if recent_id.starts_with("recent:") => {
             let path = PathBuf::from(&recent_id["recent:".len()..]);
             let app_handle = window.app_handle().clone();
@@ -687,7 +697,7 @@ pub fn repo_init(window: &Window) {
 
             handler::nonfatal!(window.emit_to(
                 EventTarget::window(window.label()),
-                "gg://menu/repo",
+                "jjuicy://menu/repo",
                 payload
             ));
         }
@@ -699,7 +709,7 @@ pub fn repo_clone(window: &Window) {
 
     handler::nonfatal!(window.emit_to(
         EventTarget::window(window.label()),
-        "gg://menu/repo",
+        "jjuicy://menu/repo",
         payload
     ));
 }
@@ -716,7 +726,7 @@ pub fn repo_clone_with_url(window: &Window, url: String) {
 
             handler::nonfatal!(window.emit_to(
                 EventTarget::window(window.label()),
-                "gg://menu/repo",
+                "jjuicy://menu/repo",
                 payload
             ));
         }

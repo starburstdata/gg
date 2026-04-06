@@ -76,19 +76,19 @@
         background: transparent;
         border: none;
         box-shadow: none;
-        color: var(--gg-colors-foreground);
-        font-family: var(--gg-text-familyUi);
+        color: var(--ju-colors-foreground);
+        font-family: var(--ju-text-familyUi);
         cursor: pointer;
-        transition: background var(--gg-components-transitionFast);
+        transition: background var(--ju-components-transitionFast);
     }
 
     .body:not(:disabled):hover {
-        background: var(--gg-colors-surfaceAlt);
+        background: var(--ju-colors-surfaceAlt);
     }
 
     .body:disabled {
         background: transparent;
-        color: var(--gg-colors-outlineStrong);
+        color: var(--ju-colors-outlineStrong);
         cursor: default;
     }
 
@@ -110,8 +110,8 @@
     }
 
     .label {
-        font-size: var(--gg-text-sizeSm);
-        line-height: var(--gg-text-lineHeightTight);
+        font-size: var(--ju-text-sizeSm);
+        line-height: var(--ju-text-lineHeightTight);
         white-space: nowrap;
     }
 
@@ -125,13 +125,13 @@
         background: transparent;
         border: none;
         box-shadow: none;
-        color: var(--gg-colors-foreground);
+        color: var(--ju-colors-foreground);
         cursor: pointer;
-        transition: background var(--gg-components-transitionFast);
+        transition: background var(--ju-components-transitionFast);
     }
 
     .chevron:hover {
-        background: var(--gg-colors-surfaceAlt);
+        background: var(--ju-colors-surfaceAlt);
     }
 
     /* keep chevron icon small regardless of toolbar height */
@@ -146,10 +146,10 @@
         top: 100%;
         left: 0;
         z-index: 100;
-        background: var(--gg-colors-background);
-        border: 1px solid var(--gg-colors-surfaceStrong);
-        border-radius: var(--gg-components-radiusSm);
-        box-shadow: var(--gg-shadows-shadowMd);
+        background: var(--ju-colors-background);
+        border: 1px solid var(--ju-colors-surfaceStrong);
+        border-radius: var(--ju-components-radiusSm);
+        box-shadow: var(--ju-shadows-shadowMd);
         min-width: 140px;
         padding: 2px 0;
     }
@@ -161,16 +161,16 @@
         background: transparent;
         border: none;
         box-shadow: none;
-        color: var(--gg-colors-foreground);
-        font-family: var(--gg-text-familyUi);
-        font-size: var(--gg-text-sizeMd);
+        color: var(--ju-colors-foreground);
+        font-family: var(--ju-text-familyUi);
+        font-size: var(--ju-text-sizeMd);
         text-align: left;
         white-space: nowrap;
         cursor: pointer;
-        transition: background var(--gg-components-transitionFast);
+        transition: background var(--ju-components-transitionFast);
     }
 
     .dropdown :global(button:hover) {
-        background: var(--gg-colors-surface);
+        background: var(--ju-colors-surface);
     }
 </style>

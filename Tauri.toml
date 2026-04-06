@@ -1,6 +1,6 @@
-productName = "gg"
+productName = "jjuicy"
 version = "0.39.1"
-identifier = "au.gulbanana.gg"
+identifier = "io.starburst.jjuicy"
 
 [[app.security.capabilities]]
 identifier = "main-capability"

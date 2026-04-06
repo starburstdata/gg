@@ -1,4 +1,4 @@
-//! Web mode: an Axum HTTP server that serves the GG frontend and exposes a
+//! Web mode: an Axum HTTP server that serves the jjuicy frontend and exposes a
 //! JSON API.
 //!
 //! The main entry point for library consumers is [`create_app`], which returns
@@ -41,7 +41,7 @@ use serde::Deserialize;
 use tauri_plugin_log::fern;
 use tokio::sync::{broadcast, oneshot};
 
-use crate::config::{GGSettings, read_config};
+use crate::config::{JjuicySettings, read_config};
 use crate::messages::mutations::{
     AbandonRevisions, AdoptRevision, BackoutRevisions, CheckoutRevision, CopyChanges, CopyHunk,
     CreateRef, CreateRevision, CreateRevisionBetween, DeleteRef, DescribeRevision,
@@ -68,14 +68,14 @@ impl<E: Into<anyhow::Error>> From<E> for ApiError {
     }
 }
 
-/// Options specific to the `gg web` CLI subcommand.
+/// Options specific to the `ju web` CLI subcommand.
 ///
 /// These control how [`run_web`] binds and launches the server. They are not
 /// needed when calling [`create_app`] directly.
 #[derive(Default)]
 pub struct WebOptions {
     /// TCP port to bind to. When `None`, uses the value from
-    /// `gg.web.default-port` in jj config (default 2178).
+    /// `jjuicy.web.default-port` in jj config (default 2178).
     pub port: Option<u16>,
     /// Force-open the browser regardless of config.
     pub launch: bool,
@@ -93,8 +93,8 @@ pub async fn run_web(options: super::RunOptions, web_options: WebOptions) -> Res
     };
     fern::Dispatch::new()
         .level(LevelFilter::Warn)
-        .level_for("gg", gg_level)
-        .level_for("gg_lib", gg_level)
+        .level_for("jjuicy", gg_level)
+        .level_for("jjuicy_lib", gg_level)
         .chain(std::io::stderr())
         .apply()?;
 
@@ -136,9 +136,9 @@ pub async fn run_web(options: super::RunOptions, web_options: WebOptions) -> Res
     Ok(())
 }
 
-/// Build an Axum [`Router`] that serves the GG frontend and JSON API.
+/// Build an Axum [`Router`] that serves the jjuicy frontend and JSON API.
 ///
-/// This is the primary integration point for embedding GG in another service.
+/// This is the primary integration point for embedding jjuicy in another service.
 /// It spawns a background worker thread (via [`WorkerSession`]) and wires up
 /// all routes. The returned [`oneshot::Receiver`] fires when the server should
 /// shut down (e.g. the last SSE client disconnected after `client_timeout`).
@@ -153,7 +153,7 @@ pub async fn run_web(options: super::RunOptions, web_options: WebOptions) -> Res
 ///
 /// ```no_run
 /// use std::path::PathBuf;
-/// use gg_lib::{RunOptions, web};
+/// use jjuicy_lib::{RunOptions, web};
 ///
 /// #[tokio::main]
 /// async fn main() -> anyhow::Result<()> {
@@ -242,7 +242,7 @@ async fn serve_index(State(state): State<AppState>) -> Result<impl IntoResponse,
 
     // used to track open tabs; done here so that it works for both vite and static assets
     let client_id = uuid::Uuid::new_v4().to_string();
-    let injected_script = format!(r#"<script>window.__GG_CLIENT_ID__="{client_id}";</script>"#);
+    let injected_script = format!(r#"<script>window.__JJUICY_CLIENT_ID__="{client_id}";</script>"#);
     let asset_html = String::from_utf8_lossy(asset.data());
     let modified_html = asset_html.replace(
         "</head>",

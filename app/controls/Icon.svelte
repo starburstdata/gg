@@ -27,14 +27,14 @@
     }
 
     .add {
-        stroke: var(--gg-colors-added);
+        stroke: var(--ju-colors-added);
     }
 
     .change {
-        stroke: var(--gg-colors-modified);
+        stroke: var(--ju-colors-modified);
     }
 
     .remove {
-        stroke: var(--gg-colors-removed);
+        stroke: var(--ju-colors-removed);
     }
 </style>

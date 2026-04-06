@@ -1,10 +1,10 @@
 # Web Mode Technical Specification
 
-Web mode allows GG to run in a browser, served by an Axum HTTP server. This document describes the architecture and key implementation details.
+Web mode allows jjuicy to run in a browser, served by an Axum HTTP server. This document describes the architecture and key implementation details.
 
 ## Overview
 
-GG supports two launch modes:
+jjuicy supports two launch modes:
 - **GUI mode**: Tauri desktop app with native windowing and IPC
 - **Web mode**: Axum server serving the frontend in a browser
 
@@ -101,7 +101,7 @@ The `event()` function in `ipc.ts` handles this transparently—it sets up Tauri
 
 | Mode | Implementation |
 |------|----------------|
-| GUI | Native popup via `forward_context_menu` → Rust → `gg://context/*` event |
+| GUI | Native popup via `forward_context_menu` → Rust → `jjuicy://context/*` event |
 | Web | HTML `<ContextMenu>` component rendered by `Object.svelte` |
 
 The web mode context menu (`app/controls/ContextMenu.svelte`) calls mutator handlers directly, bypassing the event round-trip.

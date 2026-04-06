@@ -113,7 +113,7 @@
 <style>
     .two-pane {
         display: grid;
-        grid-template-columns: 1fr var(--gg-components-separatorWidth) 1fr;
+        grid-template-columns: 1fr var(--ju-components-separatorWidth) 1fr;
         height: 100%;
         overflow: hidden;
     }
@@ -125,7 +125,7 @@
     }
 
     .separator {
-        background: var(--gg-colors-surfaceAlt);
+        background: var(--ju-colors-surfaceAlt);
         cursor: col-resize;
         position: relative;
         /* global.css sets div { pointer-events: none } for drop-transparency */
@@ -143,6 +143,6 @@
 
     .separator:hover,
     .two-pane.dragging .separator {
-        background: var(--gg-colors-surfaceStrong);
+        background: var(--ju-colors-surfaceStrong);
     }
 </style>

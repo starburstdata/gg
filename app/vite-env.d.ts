@@ -2,5 +2,5 @@
 /// <reference types="vite/client" />
 
 interface Window {
-    __GG_CLIENT_ID__?: string;
+    __JJUICY_CLIENT_ID__?: string;
 }

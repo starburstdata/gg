@@ -126,13 +126,13 @@
     if (isTauri()) {
         // web mode: mutations done directly by ContextMenu
         // gui mode: mutations triggered by native context menu
-        onEvent("gg://context/revision", mutateRevision);
-        onEvent("gg://context/tree", mutateTree);
-        onEvent("gg://context/bookmark", mutateRef);
-        onEvent("gg://context/workspace", mutateWorkspace);
-        onEvent("gg://menu/repo", mutateRepository);
+        onEvent("jjuicy://context/revision", mutateRevision);
+        onEvent("jjuicy://context/tree", mutateTree);
+        onEvent("jjuicy://context/bookmark", mutateRef);
+        onEvent("jjuicy://context/workspace", mutateWorkspace);
+        onEvent("jjuicy://menu/repo", mutateRepository);
         // gui mode: snapshot when window gains focus
-        onEvent("gg://focus", handleFocus);
+        onEvent("jjuicy://focus", handleFocus);
     }
 
     $: if ($repoConfigEvent) loadRepo($repoConfigEvent);
@@ -156,8 +156,8 @@
     $: if (!isTauri()) {
         document.title =
             $repoConfigEvent.type === "Workspace"
-                ? "GG - " + $repoConfigEvent.absolute_path.split("/").pop()
-                : "GG - Gui for JJ";
+                ? "jjuicy - " + $repoConfigEvent.absolute_path.split("/").pop()
+                : "jjuicy";
     }
     $: if (
         $repoConfigEvent.type === "LoadError" ||
@@ -292,7 +292,7 @@
             <ModalOverlay>
                 <ErrorDialog title="No Workspace Loaded" severe>
                     <p>Error communicating with backend: the operation is taking too long.</p>
-                    <p>You may need to restart GG to continue.</p>
+                    <p>You may need to restart jjuicy to continue.</p>
                     <RecentWorkspaces workspaces={recentWorkspaces} />
                 </ErrorDialog>
             </ModalOverlay>
@@ -300,7 +300,7 @@
             <ModalOverlay>
                 <ErrorDialog title="Fatal Error" severe>
                     <p>Error communicating with backend: {$repoConfigEvent.message}.</p>
-                    <p>You may need to restart GG to continue.</p>
+                    <p>You may need to restart jjuicy to continue.</p>
                     <RecentWorkspaces workspaces={recentWorkspaces} />
                 </ErrorDialog>
             </ModalOverlay>
@@ -360,21 +360,21 @@
 
         display: grid;
         grid-template-columns: 1fr;
-        grid-template-rows: var(--gg-components-toolbarHeight) 1fr var(--gg-components-separatorWidth) 30px;
+        grid-template-rows: var(--ju-components-toolbarHeight) 1fr var(--ju-components-separatorWidth) 30px;
         grid-template-areas:
             "toolbar"
             "content"
             "."
             "footer";
 
-        background: var(--gg-colors-surfaceDeep);
-        color: var(--gg-colors-foreground);
+        background: var(--ju-colors-surfaceDeep);
+        color: var(--ju-colors-foreground);
 
         user-select: none;
     }
 
     .separator {
-        background: var(--gg-colors-surfaceAlt);
+        background: var(--ju-colors-surfaceAlt);
     }
 
     p {

@@ -166,21 +166,25 @@ Core component for direct-manipulation objects. A drag&drop source.
     }
 
     .selected {
-        background: var(--gg-colors-selectionBackground);
-        color: var(--gg-colors-selectionForeground);
+        background: var(--ju-colors-selectionBackground);
+        color: var(--ju-colors-selectionForeground);
     }
 
     .selected :global(.id) {
-        color: var(--gg-colors-selectionForeground);
+        color: var(--ju-colors-selectionForeground);
     }
 
     .selected :global(.prefix) {
-        color: var(--gg-colors-highlight);
+        color: var(--ju-colors-accentSelected);
+    }
+
+    .selected :global(.divergent) {
+        color: var(--ju-colors-highlight);
     }
 
     .selected :global(.chip) {
-        background: var(--gg-colors-selectionBackground);
-        color: var(--gg-colors-selectionForeground);
+        background: var(--ju-colors-selectionBackground);
+        color: var(--ju-colors-selectionForeground);
     }
 
     .conflict {
@@ -188,63 +192,63 @@ Core component for direct-manipulation objects. A drag&drop source.
             120deg,
             transparent 0px,
             transparent 12px,
-            color-mix(in srgb, var(--gg-colors-conflictStroke) 40%, var(--gg-colors-background)) 12px,
-            color-mix(in srgb, var(--gg-colors-conflictStroke) 40%, var(--gg-colors-background)) 15px
+            color-mix(in srgb, var(--ju-colors-conflictStroke) 40%, var(--ju-colors-background)) 12px,
+            color-mix(in srgb, var(--ju-colors-conflictStroke) 40%, var(--ju-colors-background)) 15px
         );
     }
 
     .conflict :global(.feather) {
-        color: var(--gg-colors-conflict);
+        color: var(--ju-colors-conflict);
     }
 
     .selected.conflict {
         background: repeating-linear-gradient(
             120deg,
-            var(--gg-colors-conflictStroke) 0px,
-            var(--gg-colors-conflictStroke) 12px,
-            color-mix(in srgb, var(--gg-colors-conflictStroke) 80%, var(--gg-colors-background)) 12px,
-            color-mix(in srgb, var(--gg-colors-conflictStroke) 80%, var(--gg-colors-background)) 15px
+            var(--ju-colors-conflictStroke) 0px,
+            var(--ju-colors-conflictStroke) 12px,
+            color-mix(in srgb, var(--ju-colors-conflictStroke) 80%, var(--ju-colors-background)) 12px,
+            color-mix(in srgb, var(--ju-colors-conflictStroke) 80%, var(--ju-colors-background)) 15px
         );
-        color: var(--gg-colors-warningContent);
+        color: var(--ju-colors-warningContent);
     }
 
     .selected.conflict :global(.id) {
-        color: var(--gg-colors-foreground);
+        color: var(--ju-colors-warningContent);
     }
 
     .selected.conflict :global(.prefix) {
-        color: var(--gg-colors-accent);
+        color: var(--ju-colors-accent);
     }
 
     .selected.conflict :global(.feather) {
-        color: var(--gg-colors-conflictAlt);
+        color: var(--ju-colors-conflictAlt);
     }
 
     .context {
-        color: var(--gg-colors-background);
+        color: var(--ju-colors-background);
     }
 
     .hint {
-        color: var(--gg-colors-highlight);
+        color: var(--ju-colors-highlight);
     }
 
     .selected :global(.feather.remove) {
-        stroke: var(--gg-colors-removedAlt);
+        stroke: var(--ju-colors-removedAlt);
     }
 
     .selected :global(.feather.add) {
-        stroke: var(--gg-colors-addedAlt);
+        stroke: var(--ju-colors-addedAlt);
     }
 
     .selected :global(.feather.change) {
-        stroke: var(--gg-colors-modifiedAlt);
+        stroke: var(--ju-colors-modifiedAlt);
     }
 
     .selected :global(.desc.indescribable) {
-        color: var(--gg-colors-selectionForegroundMuted);
+        color: var(--ju-colors-selectionForegroundMuted);
     }
 
     .selected :global(.author) {
-        color: var(--gg-colors-selectionForegroundMuted);
+        color: var(--ju-colors-selectionForegroundMuted);
     }
 </style>

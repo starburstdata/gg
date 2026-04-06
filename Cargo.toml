@@ -1,7 +1,7 @@
 [package]
-name = "gg-cli"
+name = "jjuicy-cli"
 version = "0.39.1"
-description = "GG - Gui for JJ"
+description = "jjuicy - a GUI for Jujutsu"
 authors = ["Thomas Castiglione"]
 edition = "2024"
 license = "Apache-2.0"
@@ -25,11 +25,11 @@ include = [
 pre-release-hook = ["npm", "run", "build"]
 
 [lib]
-name = "gg_lib"
+name = "jjuicy_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "gg"
+name = "ju"
 path = "src/main.rs"
 
 # custom-protocol is magic - tauri build adds it, tauri dev removes. it's on by default so that cargo run works

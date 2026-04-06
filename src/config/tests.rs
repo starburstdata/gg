@@ -14,12 +14,12 @@ const JJ_TEST_DEFAULTS: &str = r#"
     behavior = "drop"
 "#;
 
-/// Create isolated test settings with only gg.toml defaults, no user config.
+/// Create isolated test settings with only jjuicy.toml defaults, no user config.
 pub fn settings_with_gg_defaults() -> UserSettings {
     let mut config = StackedConfig::empty();
     config.add_layer(ConfigLayer::parse(ConfigSource::Default, JJ_TEST_DEFAULTS).unwrap());
     config.add_layer(
-        ConfigLayer::parse(ConfigSource::Default, include_str!("../config/gg.toml")).unwrap(),
+        ConfigLayer::parse(ConfigSource::Default, include_str!("../config/jjuicy.toml")).unwrap(),
     );
     UserSettings::from_config(config).unwrap()
 }
@@ -29,18 +29,18 @@ fn settings_with_overrides(toml: &str) -> UserSettings {
     let mut config = StackedConfig::empty();
     config.add_layer(ConfigLayer::parse(ConfigSource::Default, JJ_TEST_DEFAULTS).unwrap());
     config.add_layer(
-        ConfigLayer::parse(ConfigSource::Default, include_str!("../config/gg.toml")).unwrap(),
+        ConfigLayer::parse(ConfigSource::Default, include_str!("../config/jjuicy.toml")).unwrap(),
     );
     config.add_layer(ConfigLayer::parse(ConfigSource::User, toml).unwrap());
     UserSettings::from_config(config).unwrap()
 }
 
-/// Create test settings with gg.* config override extraction applied.
+/// Create test settings with jjuicy.* config override extraction applied.
 fn settings_with_extracted_overrides(toml: &str) -> UserSettings {
     let mut config = StackedConfig::empty();
     config.add_layer(ConfigLayer::parse(ConfigSource::Default, JJ_TEST_DEFAULTS).unwrap());
     config.add_layer(
-        ConfigLayer::parse(ConfigSource::Default, include_str!("../config/gg.toml")).unwrap(),
+        ConfigLayer::parse(ConfigSource::Default, include_str!("../config/jjuicy.toml")).unwrap(),
     );
     config.add_layer(ConfigLayer::parse(ConfigSource::User, toml).unwrap());
     if let Some(overrides) = extract_overrides(&config) {
@@ -59,7 +59,7 @@ fn track_recent_workspaces_default_is_true() {
 fn track_recent_workspaces_can_be_disabled() {
     let settings = settings_with_overrides(
         r#"
-            [gg.ui]
+            [jjuicy.ui]
             track-recent-workspaces = false
             "#,
     );
@@ -76,7 +76,7 @@ fn mark_unpushed_bookmarks_default_is_true() {
 fn mark_unpushed_bookmarks_can_be_disabled() {
     let settings = settings_with_overrides(
         r#"
-            [gg.ui]
+            [jjuicy.ui]
             mark-unpushed-bookmarks = false
             "#,
     );
@@ -85,12 +85,12 @@ fn mark_unpushed_bookmarks_can_be_disabled() {
 
 #[test]
 fn mark_unpushed_bookmarks_legacy_name_fallback() {
-    // without gg.toml to test the fallback behavior
+    // without jjuicy.toml to test the fallback behavior
     let mut config = StackedConfig::empty();
     config.add_layer(
         ConfigLayer::parse(
             ConfigSource::Default,
-            &format!("{JJ_TEST_DEFAULTS}\n[gg.ui]\nmark-unpushed-branches = false"),
+            &format!("{JJ_TEST_DEFAULTS}\n[jjuicy.ui]\nmark-unpushed-branches = false"),
         )
         .unwrap(),
     );
@@ -102,7 +102,7 @@ fn mark_unpushed_bookmarks_legacy_name_fallback() {
 fn mark_unpushed_bookmarks_new_name_takes_precedence() {
     let settings = settings_with_overrides(
         r#"
-            [gg.ui]
+            [jjuicy.ui]
             mark-unpushed-branches = false
             mark-unpushed-bookmarks = true
             "#,
@@ -120,7 +120,7 @@ fn log_page_size_default() {
 fn log_page_size_can_be_overridden() {
     let settings = settings_with_overrides(
         r#"
-            [gg.queries]
+            [jjuicy.queries]
             log-page-size = 500
             "#,
     );
@@ -143,7 +143,7 @@ fn auto_snapshot_default_is_none() {
 fn auto_snapshot_can_be_enabled() {
     let settings = settings_with_overrides(
         r#"
-            [gg.queries]
+            [jjuicy.queries]
             auto-snapshot = true
             "#,
     );
@@ -160,7 +160,7 @@ fn theme_override_default_is_none() {
 fn theme_override_can_be_set() {
     let settings = settings_with_overrides(
         r#"
-            [gg.ui]
+            [jjuicy.ui]
             theme-override = "dark"
             "#,
     );
@@ -177,7 +177,7 @@ fn recent_workspaces_default_is_empty() {
 fn recent_workspaces_returns_configured_paths() {
     let settings = settings_with_overrides(
         r#"
-            [gg.ui]
+            [jjuicy.ui]
             recent-workspaces = ["/path/one", "/path/two"]
             "#,
     );
@@ -188,7 +188,7 @@ fn recent_workspaces_returns_configured_paths() {
 }
 
 mod extract_overrides {
-    use super::super::{GGSettings, extract_overrides, native_keys};
+    use super::super::{JjuicySettings, extract_overrides, native_keys};
     use super::{JJ_TEST_DEFAULTS, settings_with_extracted_overrides};
     use jj_lib::config::{ConfigLayer, ConfigSource, StackedConfig};
     use jj_lib::settings::UserSettings;
@@ -197,7 +197,7 @@ mod extract_overrides {
     fn override_basic_user_name() {
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.user]
+            [jjuicy.user]
             name = "GG User"
             "#,
         );
@@ -210,7 +210,7 @@ mod extract_overrides {
             r#"
             [user]
             name = "CLI User"
-            [gg.user]
+            [jjuicy.user]
             name = "GG User"
             "#,
         );
@@ -221,7 +221,7 @@ mod extract_overrides {
     fn override_with_dotted_key_syntax() {
         let settings = settings_with_extracted_overrides(
             r#"
-            gg.user.name = "Dotted GG"
+            jjuicy.user.name = "Dotted GG"
             [user]
             name = "CLI User"
             "#,
@@ -233,7 +233,7 @@ mod extract_overrides {
     fn override_nested_table() {
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.snapshot]
+            [jjuicy.snapshot]
             auto-track = "glob:src/**"
             "#,
         );
@@ -247,10 +247,10 @@ mod extract_overrides {
     fn override_multiple_keys() {
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.user]
+            [jjuicy.user]
             name = "GG User"
             email = "gg@example.com"
-            [gg.signing]
+            [jjuicy.signing]
             behavior = "own"
             "#,
         );
@@ -263,11 +263,11 @@ mod extract_overrides {
     fn native_gg_keys_are_not_overrides() {
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.queries]
+            [jjuicy.queries]
             log-page-size = 42
             "#,
         );
-        // gg.queries.log-page-size is a native GG key, not an override for "queries.log-page-size"
+        // jjuicy.queries.log-page-size is a native jjuicy key, not an override for "queries.log-page-size"
         assert_eq!(settings.query_log_page_size(), 42);
         assert!(settings.get_string("queries.log-page-size").is_err());
     }
@@ -285,17 +285,18 @@ mod extract_overrides {
 
     #[test]
     fn override_from_higher_layer_wins() {
-        // user-level gg.user.name vs repo-level gg.user.name: repo wins
+        // user-level jjuicy.user.name vs repo-level jjuicy.user.name: repo wins
         let mut config = StackedConfig::empty();
         config.add_layer(ConfigLayer::parse(ConfigSource::Default, JJ_TEST_DEFAULTS).unwrap());
         config.add_layer(
-            ConfigLayer::parse(ConfigSource::Default, include_str!("../config/gg.toml")).unwrap(),
+            ConfigLayer::parse(ConfigSource::Default, include_str!("../config/jjuicy.toml"))
+                .unwrap(),
         );
         config.add_layer(
-            ConfigLayer::parse(ConfigSource::User, r#"gg.user.name = "User Level""#).unwrap(),
+            ConfigLayer::parse(ConfigSource::User, r#"jjuicy.user.name = "User Level""#).unwrap(),
         );
         config.add_layer(
-            ConfigLayer::parse(ConfigSource::Repo, r#"gg.user.name = "Repo Level""#).unwrap(),
+            ConfigLayer::parse(ConfigSource::Repo, r#"jjuicy.user.name = "Repo Level""#).unwrap(),
         );
         if let Some(overrides) = extract_overrides(&config) {
             config.add_layer(overrides);
@@ -306,14 +307,15 @@ mod extract_overrides {
 
     #[test]
     fn override_beats_repo_level_regular_setting() {
-        // user-level gg.user.name should beat repo-level user.name
+        // user-level jjuicy.user.name should beat repo-level user.name
         let mut config = StackedConfig::empty();
         config.add_layer(ConfigLayer::parse(ConfigSource::Default, JJ_TEST_DEFAULTS).unwrap());
         config.add_layer(
-            ConfigLayer::parse(ConfigSource::Default, include_str!("../config/gg.toml")).unwrap(),
+            ConfigLayer::parse(ConfigSource::Default, include_str!("../config/jjuicy.toml"))
+                .unwrap(),
         );
         config.add_layer(
-            ConfigLayer::parse(ConfigSource::User, r#"gg.user.name = "GG User""#).unwrap(),
+            ConfigLayer::parse(ConfigSource::User, r#"jjuicy.user.name = "GG User""#).unwrap(),
         );
         config.add_layer(
             ConfigLayer::parse(ConfigSource::Repo, r#"user.name = "Repo CLI User""#).unwrap(),
@@ -328,7 +330,7 @@ mod extract_overrides {
     #[test]
     fn native_keys_discovered_from_gg_toml() {
         let keys = native_keys();
-        // leaf keys from gg.toml
+        // leaf keys from jjuicy.toml
         assert!(keys.contains("default-mode"));
         assert!(keys.contains("queries.log-page-size"));
         assert!(keys.contains("queries.large-repo-heuristic"));
@@ -339,7 +341,7 @@ mod extract_overrides {
         assert!(keys.contains("web.default-port"));
         assert!(keys.contains("web.client-timeout"));
         assert!(keys.contains("web.launch-browser"));
-        // supplementary keys not in gg.toml
+        // supplementary keys not in jjuicy.toml
         assert!(keys.contains("queries.auto-snapshot"));
         assert!(keys.contains("ui.mark-unpushed-branches"));
         // table prefixes should NOT be in the set (only leaf keys)
@@ -350,15 +352,15 @@ mod extract_overrides {
 
     #[test]
     fn mixed_ui_table_native_and_override() {
-        // gg.ui.theme-override is native, gg.ui.diff-editor is a jj override
+        // jjuicy.ui.theme-override is native, jjuicy.ui.diff-editor is a jj override
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.ui]
+            [jjuicy.ui]
             theme-override = "dark"
             diff-editor = "meld"
             "#,
         );
-        // native key stays under gg.ui, not injected as ui.theme-override
+        // native key stays under jjuicy.ui, not injected as ui.theme-override
         assert_eq!(settings.ui_theme_override(), Some("dark".to_string()));
         assert!(settings.get_string("ui.theme-override").is_err());
         // override key is injected as ui.diff-editor
@@ -367,26 +369,28 @@ mod extract_overrides {
 
     #[test]
     fn preset_is_native() {
-        // custom presets are GG-native, not jj overrides
+        // custom presets are jjuicy-native, not jj overrides
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.presets]
+            [jjuicy.presets]
             my-custom-preset = "bookmarks()"
             "#,
         );
         assert!(settings.get_string("presets.my-custom-preset").is_err());
         assert_eq!(
-            settings.get_string("gg.presets.my-custom-preset").unwrap(),
+            settings
+                .get_string("jjuicy.presets.my-custom-preset")
+                .unwrap(),
             "bookmarks()"
         );
     }
 
     #[test]
     fn revset_override_is_forwarded() {
-        // gg.revsets.* keys are pure jj overrides now that presets live elsewhere
+        // jjuicy.revsets.* keys are pure jj overrides now that presets live elsewhere
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.revsets]
+            [jjuicy.revsets]
             short-prefixes = "trunk()"
             log = "all()"
             "#,
@@ -403,17 +407,17 @@ mod extract_overrides {
         // presets stay native, revset overrides get forwarded
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.presets]
+            [jjuicy.presets]
             my-preset = "trunk()..@"
 
-            [gg.revsets]
+            [jjuicy.revsets]
             short-prefixes = "trunk()"
             "#,
         );
         // my-preset is native — not injected
         assert!(settings.get_string("presets.my-preset").is_err());
         assert_eq!(
-            settings.get_string("gg.presets.my-preset").unwrap(),
+            settings.get_string("jjuicy.presets.my-preset").unwrap(),
             "trunk()..@"
         );
         // short-prefixes is a jj override — injected
@@ -427,7 +431,7 @@ mod extract_overrides {
     fn deep_nesting_override() {
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.signing.backends.gpg]
+            [jjuicy.signing.backends.gpg]
             program = "/usr/bin/gpg2"
             "#,
         );
@@ -439,18 +443,19 @@ mod extract_overrides {
 
     #[test]
     fn cross_layer_merge_preserves_siblings() {
-        // user layer sets gg.signing.behavior, repo layer sets gg.signing.backend
+        // user layer sets jjuicy.signing.behavior, repo layer sets jjuicy.signing.backend
         // both should end up in the override doc
         let mut config = StackedConfig::empty();
         config.add_layer(ConfigLayer::parse(ConfigSource::Default, JJ_TEST_DEFAULTS).unwrap());
         config.add_layer(
-            ConfigLayer::parse(ConfigSource::Default, include_str!("../config/gg.toml")).unwrap(),
+            ConfigLayer::parse(ConfigSource::Default, include_str!("../config/jjuicy.toml"))
+                .unwrap(),
         );
         config.add_layer(
-            ConfigLayer::parse(ConfigSource::User, r#"gg.signing.behavior = "own""#).unwrap(),
+            ConfigLayer::parse(ConfigSource::User, r#"jjuicy.signing.behavior = "own""#).unwrap(),
         );
         config.add_layer(
-            ConfigLayer::parse(ConfigSource::Repo, r#"gg.signing.backend = "gpg""#).unwrap(),
+            ConfigLayer::parse(ConfigSource::Repo, r#"jjuicy.signing.backend = "gpg""#).unwrap(),
         );
         if let Some(overrides) = extract_overrides(&config) {
             config.add_layer(overrides);
@@ -462,10 +467,10 @@ mod extract_overrides {
 
     #[test]
     fn auto_snapshot_not_injected_as_override() {
-        // gg.queries.auto-snapshot is native (supplementary list), not a jj override
+        // jjuicy.queries.auto-snapshot is native (supplementary list), not a jj override
         let settings = settings_with_extracted_overrides(
             r#"
-            [gg.queries]
+            [jjuicy.queries]
             auto-snapshot = true
             "#,
         );

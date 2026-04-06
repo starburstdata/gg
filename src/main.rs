@@ -11,19 +11,19 @@ use std::path::PathBuf;
 #[allow(unused_imports)]
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use gg_lib::config::read_config;
-use gg_lib::web;
-use gg_lib::{RunOptions, askpass};
 use jj_lib::settings::UserSettings;
+use jjuicy_lib::config::read_config;
+use jjuicy_lib::web;
+use jjuicy_lib::{RunOptions, askpass};
 
 #[derive(clap::Subcommand, Debug)]
 enum Subcommand {
-    /// Launch GG in GUI mode (default).
+    /// Launch jjuicy in GUI mode (default).
     Gui {
         /// Open this directory (instead of the current working directory).
         workspace: Option<PathBuf>,
     },
-    /// Launch GG in web mode.
+    /// Launch jjuicy in web mode.
     Web {
         /// Open this directory (instead of the current working directory).
         workspace: Option<PathBuf>,
@@ -32,11 +32,11 @@ enum Subcommand {
         #[arg(short, long)]
         port: Option<u16>,
 
-        /// Open a browser automatically (overrides gg.web.launch-browser config).
+        /// Open a browser automatically (overrides jjuicy.web.launch-browser config).
         #[arg(long, conflicts_with = "no_launch")]
         launch: bool,
 
-        /// Don't open a browser automatically (overrides gg.web.launch-browser config).
+        /// Don't open a browser automatically (overrides jjuicy.web.launch-browser config).
         #[arg(long, conflicts_with = "launch")]
         no_launch: bool,
     },
@@ -60,7 +60,7 @@ struct Args {
     #[arg(long, global = true)]
     ignore_immutable: bool,
 
-    /// Start a new GG process even if one is already running. Without this flag,
+    /// Start a new jjuicy process even if one is already running. Without this flag,
     /// CLI invocations attach to an existing instance when available.
     #[arg(long, global = true)]
     new_instance: bool,
@@ -115,7 +115,7 @@ enum LaunchMode {
 }
 
 fn default_mode(settings: &UserSettings) -> LaunchMode {
-    match settings.get_string("gg.default-mode").ok().as_deref() {
+    match settings.get_string("jjuicy.default-mode").ok().as_deref() {
         Some("web") => LaunchMode::Web,
         _ => LaunchMode::Gui,
     }
@@ -183,7 +183,7 @@ fn should_spawn() -> bool {
     return true;
 
     // app builds on macOS fork when launched from a terminal, so that
-    // running `gg` from a shell prompt returns control to the user.
+    // running `ju` from a shell prompt returns control to the user.
     // when launched from Finder/Dock/Spotlight there's no terminal.
     #[cfg(all(feature = "app", target_os = "macos"))]
     {
@@ -206,7 +206,7 @@ fn spawn_app() -> Result<()> {
 
     cmd.args(std::env::args().skip(1)); // forward all original arguments
     cmd.arg("--foreground");
-    cmd.env("GG_SPAWNED", "1");
+    cmd.env("JJUICY_SPAWNED", "1");
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::inherit()); // forward logs until startup is complete
 
@@ -245,7 +245,7 @@ fn run_app(args: Args) -> Result<()> {
     let mode = args.mode().unwrap_or_else(|| default_mode(&settings));
     let context = tauri::generate_context!();
 
-    let is_child = std::env::var_os("GG_SPAWNED").is_some();
+    let is_child = std::env::var_os("JJUICY_SPAWNED").is_some();
 
     let options = RunOptions {
         context,

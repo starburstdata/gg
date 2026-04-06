@@ -1,10 +1,10 @@
 # GUI Mode Technical Specification
 
-GUI mode is GG's primary desktop experience, built on Tauri with native windowing, menus, and IPC. This document describes the architecture and key implementation details.
+GUI mode is jjuicy's primary desktop experience, built on Tauri with native windowing, menus, and IPC. This document describes the architecture and key implementation details.
 
 ## Overview
 
-GG supports two launch modes:
+jjuicy supports two launch modes:
 - **GUI mode**: Tauri desktop app with native windowing and IPC
 - **Web mode**: Axum server serving the frontend in a browser
 
@@ -97,17 +97,17 @@ GUI mode uses Tauri's bidirectional event system for push updates:
 
 | Event | Payload | Trigger |
 |-------|---------|---------|
-| `gg://repo/config` | `RepoConfig` | Workspace opened, worker error |
-| `gg://repo/status` | `RepoStatus` | Mutation completed |
-| `gg://menu/revision` | `string` | Menu item selected |
-| `gg://focus` | `()` | Window focused |
+| `jjuicy://repo/config` | `RepoConfig` | Workspace opened, worker error |
+| `jjuicy://repo/status` | `RepoStatus` | Mutation completed |
+| `jjuicy://menu/revision` | `string` | Menu item selected |
+| `jjuicy://focus` | `()` | Window focused |
 
 Events are emitted via `window.emit_to()`:
 
 ```rust
 window.emit_to(
     EventTarget::labeled(window.label()),
-    "gg://focus",
+    "jjuicy://focus",
     ()
 )
 ```
@@ -116,12 +116,12 @@ window.emit_to(
 
 | Event | Payload | Purpose |
 |-------|---------|---------|
-| `gg://revision/select` | `RevHeader \| null` | Update menu item enabled state |
+| `jjuicy://revision/select` | `RevHeader \| null` | Update menu item enabled state |
 
 The frontend listens and emits events via stores created with `event()` from `ipc.ts`:
 
 ```typescript
-export const repoStatusEvent = await event<RepoStatus | undefined>("gg://repo/status", undefined);
+export const repoStatusEvent = await event<RepoStatus | undefined>("jjuicy://repo/status", undefined);
 ```
 
 ## Window Management
@@ -150,7 +150,7 @@ Opening the same workspace twice focuses the existing window.
 
 1. **Creation**: `try_create_window()` builds a `WebviewWindow` with plugins
 2. **Setup**: `setup_window()` spawns worker thread, registers event handlers
-3. **Focus**: Emits `gg://focus` event; frontend calls `query_snapshot` to refresh
+3. **Focus**: Emits `jjuicy://focus` event; frontend calls `query_snapshot` to refresh
 4. **Destruction**: Worker channel dropped, thread exits, state removed
 
 ## Native Menus
@@ -161,7 +161,7 @@ Built in `menu::build_main()` with platform-specific items:
 - **macOS**: App menu with About, Services, Hide, Quit
 - **All platforms**: Repository, Revision, Edit menus
 
-The Revision menu is dynamically enabled/disabled based on `gg://revision/select` events.
+The Revision menu is dynamically enabled/disabled based on `jjuicy://revision/select` events.
 
 ### Context Menus
 
@@ -176,7 +176,7 @@ Context menus are shown via `window.popup_menu()` after enabling appropriate ite
 
 1. User right-clicks object → `forward_context_menu` command
 2. `handle_context()` enables menu items, calls `window.popup_menu()`
-3. User selects item → `handle_event()` emits `gg://menu/*` event
+3. User selects item → `handle_event()` emits `jjuicy://menu/*` event
 4. Frontend receives event, calls appropriate mutator
 
 ## Plugins
@@ -200,7 +200,7 @@ let window_worker = thread::spawn(move || {
 });
 ```
 
-The worker loops on `WorkerSession::handle_events()`, processing `SessionEvent`s from the IPC commands. If the worker encounters an unrecoverable error, it restarts and emits `gg://repo/config` with `WorkerError`.
+The worker loops on `WorkerSession::handle_events()`, processing `SessionEvent`s from the IPC commands. If the worker encounters an unrecoverable error, it restarts and emits `jjuicy://repo/config` with `WorkerError`.
 
 ## Accelerators
 
@@ -221,7 +221,7 @@ Menu items define accelerators like `"cmdorctrl+o"` for cross-platform support.
 
 GUI mode maintains a recent workspaces list:
 
-1. On workspace open, `add_recent_workspaces()` updates `gg.ui.recent-workspaces` config
+1. On workspace open, `add_recent_workspaces()` updates `jjuicy.ui.recent-workspaces` config
 2. List is truncated to 10 entries
 3. On Windows, also updates the taskbar jump list
 
@@ -241,7 +241,7 @@ The update runs in a background thread to avoid blocking the UI.
 ## Launching GUI Mode
 
 ```bash
-# Default (when gg.default-mode = "gui")
+# Default (when jjuicy.default-mode = "gui")
 cargo run
 
 # Explicit

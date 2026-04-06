@@ -50,20 +50,26 @@ pub fn default_theme() -> Theme {
 }
 
 const BUNDLED_THEMES: &[(&str, &str)] = &[
-    ("default.toml", include_str!("../../res/themes/default.toml")),
+    (
+        "default.toml",
+        include_str!("../../res/themes/default.toml"),
+    ),
     ("macos.toml", include_str!("../../res/themes/macos.toml")),
-    ("material.toml", include_str!("../../res/themes/material.toml")),
+    (
+        "material.toml",
+        include_str!("../../res/themes/material.toml"),
+    ),
     ("fluent.toml", include_str!("../../res/themes/fluent.toml")),
 ];
 
-/// Returns the path to the themes directory (`~/.config/gg/themes/`).
+/// Returns the path to the themes directory (`~/.config/jjuicy/themes/`).
 pub fn themes_dir() -> Option<PathBuf> {
     let home = etcetera::home_dir().ok()?;
-    Some(home.join(".config").join("gg").join("themes"))
+    Some(home.join(".config").join("jjuicy").join("themes"))
 }
 
 /// Load the theme from user settings, falling back to the bundled default.
-pub fn load_from_settings(settings: &dyn crate::config::GGSettings) -> Theme {
+pub fn load_from_settings(settings: &dyn crate::config::JjuicySettings) -> Theme {
     if let Some(path) = settings.ui_theme_file() {
         let expanded = expand_home(&path);
         match load_theme(&expanded) {
@@ -74,10 +80,10 @@ pub fn load_from_settings(settings: &dyn crate::config::GGSettings) -> Theme {
     default_theme()
 }
 
-/// Generate CSS rules that set `--gg-*` custom properties for
+/// Generate CSS rules that set `--ju-*` custom properties for
 /// both light and dark variants (using `prefers-color-scheme`).
 /// When `theme_override` is set, only that variant is emitted.
-pub fn generate_css(settings: &dyn crate::config::GGSettings) -> String {
+pub fn generate_css(settings: &dyn crate::config::JjuicySettings) -> String {
     let theme = load_from_settings(settings);
     let override_pref = settings.ui_theme_override();
 
@@ -85,7 +91,7 @@ pub fn generate_css(settings: &dyn crate::config::GGSettings) -> String {
 
     let emit_variant = |tokens: &ThemeTokens, scheme: &str, css: &mut String| {
         for (key, value) in tokens {
-            css.push_str(&format!("  --gg-{key}: {value};\n"));
+            css.push_str(&format!("  --ju-{key}: {value};\n"));
         }
         css.push_str(&format!("  color-scheme: {scheme};\n"));
     };
@@ -109,7 +115,7 @@ pub fn generate_css(settings: &dyn crate::config::GGSettings) -> String {
             css.push_str("@media (prefers-color-scheme: dark) {\n");
             css.push_str("  #shell {\n");
             for (key, value) in &theme.dark {
-                css.push_str(&format!("    --gg-{key}: {value};\n"));
+                css.push_str(&format!("    --ju-{key}: {value};\n"));
             }
             css.push_str("    color-scheme: dark;\n");
             css.push_str("  }\n");
@@ -121,9 +127,9 @@ pub fn generate_css(settings: &dyn crate::config::GGSettings) -> String {
 }
 
 /// Wrap [`generate_css`] output in a `<style>` element for HTML injection.
-pub fn generate_style_element(settings: &dyn crate::config::GGSettings) -> String {
+pub fn generate_style_element(settings: &dyn crate::config::JjuicySettings) -> String {
     format!(
-        "<style id=\"gg-theme\">\n{}</style>",
+        "<style id=\"ju-theme\">\n{}</style>",
         generate_css(settings)
     )
 }
@@ -138,7 +144,7 @@ fn expand_home(path: &str) -> PathBuf {
     PathBuf::from(path)
 }
 
-/// Write bundled theme files to `~/.config/gg/themes/` if the directory
+/// Write bundled theme files to `~/.config/jjuicy/themes/` if the directory
 /// doesn't exist yet. Existing files are never overwritten.
 pub fn ensure_bundled_themes() {
     let Some(dir) = themes_dir() else {
@@ -222,7 +228,9 @@ fn resolve_refs(value: &str, tokens: &ThemeTokens) -> String {
         rest = &rest[dollar_pos + 1..];
 
         // extract section.key
-        if let Some(ref_end) = rest.find(|c: char| !c.is_alphanumeric() && c != '.' && c != '-' && c != '_') {
+        if let Some(ref_end) =
+            rest.find(|c: char| !c.is_alphanumeric() && c != '.' && c != '-' && c != '_')
+        {
             let ref_name = &rest[..ref_end];
             if let Some(resolved) = lookup_ref(ref_name, tokens) {
                 result.push_str(&resolved);

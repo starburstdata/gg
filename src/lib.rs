@@ -1,12 +1,12 @@
-//! # GG: Gui for [JJ](https://jj-vcs.github.io/jj/)
+//! # jjuicy: Gui for [JJ](https://jj-vcs.github.io/jj/)
 //!
-//! This crate exposes two ways to embed GG's functionality in your own application:
+//! This crate exposes two ways to embed jjuicy's functionality in your own application:
 //!
-//! ## Axum router (for embedding `gg web`)
+//! ## Axum router (for embedding `ju web`)
 //!
 //! [`web::create_app`] returns an [`axum::Router`] that serves both the embedded
 //! UI and a JSON API. This is the easiest integration path — you get a fully
-//! working GG instance that can be composed with other Axum services or bound to
+//! working jjuicy instance that can be composed with other Axum services or bound to
 //! any [`tokio::net::TcpListener`].
 //!
 //! ## Worker session (for a custom embedding or use as an API)
@@ -59,11 +59,11 @@ pub struct RunOptions {
     /// act as an askpass client.
     pub enable_askpass: bool,
 
-    /// Enable verbose logging (`LevelFilter::Debug` for the `gg` target).
+    /// Enable verbose logging (`LevelFilter::Debug` for the `jjuicy` target).
     #[doc(hidden)]
     pub debug: bool,
 
-    /// Indicates this process was spawned by another GG instance. When `true`,
+    /// Indicates this process was spawned by another jjuicy instance. When `true`,
     /// the web server prints `"Startup complete."` to stdout so the parent
     /// knows the port is ready.
     #[doc(hidden)]

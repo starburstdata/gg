@@ -11,11 +11,11 @@ import type { InputRequest } from "./messages/InputRequest";
 import type { InputResponse } from "./messages/InputResponse";
 import type { RevChange } from "./messages/RevChange";
 
-export const repoConfigEvent = await event<RepoConfig>("gg://repo/config", { type: "Initial" });
-export const repoStatusEvent = await event<RepoStatus | undefined>("gg://repo/status", undefined);
-export const revisionSelectEvent = await event<RevSet | undefined>("gg://revision/select", undefined);
-export const changeSelectEvent = await event<RevChange | undefined>("gg://change/select", undefined);
-export const progressEvent = await event<ProgressEvent | undefined>("gg://progress", undefined);
+export const repoConfigEvent = await event<RepoConfig>("jjuicy://repo/config", { type: "Initial" });
+export const repoStatusEvent = await event<RepoStatus | undefined>("jjuicy://repo/status", undefined);
+export const revisionSelectEvent = await event<RevSet | undefined>("jjuicy://revision/select", undefined);
+export const changeSelectEvent = await event<RevChange | undefined>("jjuicy://change/select", undefined);
+export const progressEvent = await event<ProgressEvent | undefined>("jjuicy://progress", undefined);
 
 export const currentMutation = writable<Query<MutationResult> | null>(null);
 export const currentContext = writable<Operand | null>();

@@ -1,6 +1,6 @@
 //! Progress reporting implementation for GUI mode - sends events to a Tauri window by emitting events.
 
-use gg_lib::worker::EventSink;
+use jjuicy_lib::worker::EventSink;
 use std::sync::Arc;
 use tauri::{Emitter, EventTarget, Window};
 

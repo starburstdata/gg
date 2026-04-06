@@ -422,14 +422,14 @@
         display: flex;
         align-items: baseline;
         gap: 6px;
-        border-bottom: 1px solid var(--gg-colors-surface);
+        border-bottom: 1px solid var(--ju-colors-surface);
 
         /* skip past svg lines when used in a graph */
         padding-left: var(--leftpad);
     }
 
     .layout.target {
-        background: var(--gg-colors-accent);
+        background: var(--ju-colors-accent);
         color: black;
     }
 
@@ -439,19 +439,19 @@
 
     .desc {
         grid-area: desc;
-        font-family: var(--gg-text-familyUi);
+        font-family: var(--ju-text-familyUi);
         flex: 1 1 0;
         min-width: 0;
     }
 
     .desc.indescribable {
-        color: var(--gg-colors-foregroundMuted);
+        color: var(--ju-colors-foregroundMuted);
     }
 
     .email {
         display: none;
         text-align: right;
-        font-family: var(--gg-text-familyUi);
+        font-family: var(--ju-text-familyUi);
         flex: 0 0 auto;
     }
 
@@ -461,7 +461,7 @@
         display: flex;
         justify-content: end;
         gap: 3px;
-        color: var(--gg-colors-foreground);
+        color: var(--ju-colors-foreground);
         min-width: 0;
         overflow: hidden;
     }

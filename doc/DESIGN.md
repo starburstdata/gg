@@ -1,6 +1,6 @@
 Design Principles
 -----------------
-The primary metaphor is *direct manipulation*. GG aims to present a view of the repository's 
+The primary metaphor is *direct manipulation*. jjuicy aims to present a view of the repository's 
 conceptual contents - revisions, changes to files, synced refs and maybe more - which can be
 modified, using right-click and drag-drop, to 'edit' the repo as a whole. 
 
@@ -39,14 +39,14 @@ Drag & drop capabilities are implemented by `objects/Object.svelte`, a draggable
 
 Bookmark Objects
 --------------
-The representation of bookmarks, in JJ and GG, is a bit complicated; there are multiple state axes.
+The representation of bookmarks, in JJ and jjuicy, is a bit complicated; there are multiple state axes.
 A repository can have zero or more **remotes**. 
 A **local bookmark** can track zero or more of the remotes. (Technically, remote *branches*.)
 A **remote bookmark** can be any of *tracked* (a flag on the ref), *synced* (if it points to the same 
 commit as a local bookmark of the same name), and *absent* (if there's a local bookmark with *no* ref, 
 in which case it will be deleted by the CLI on push.
 
-GG attempts to simplify the display of bookmarks by combining refs in the UI. Taking advantage of 
+jjuicy attempts to simplify the display of bookmarks by combining refs in the UI. Taking advantage of 
 Jujutsu's model, which guarantees that a bookmark name identifies the same bookmark across remotes, a 
 local bookmark and the tracked remote bookmarks with which it is currently synced are be combined into
 a single UI object. Remote bookmarks are displayed separately if they're unsynced, untracked or absent.

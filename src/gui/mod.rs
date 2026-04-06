@@ -24,8 +24,8 @@ use tauri::{AppHandle, Emitter, EventTarget, Listener, Manager, State, Window, W
 use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_window_state::StateFlags;
 
-use gg_lib::config::GGSettings;
-use gg_lib::messages::{
+use jjuicy_lib::config::JjuicySettings;
+use jjuicy_lib::messages::{
     self,
     mutations::{
         AbandonRevisions, AdoptRevision, BackoutRevisions, CheckoutRevision, CloneRepository,
@@ -36,7 +36,7 @@ use gg_lib::messages::{
         TrackBookmark, UndoOperation, UntrackBookmark,
     },
 };
-use gg_lib::worker::{Mutation, Session, SessionEvent, WorkerSession};
+use jjuicy_lib::worker::{Mutation, Session, SessionEvent, WorkerSession};
 use sink::TauriSink;
 
 struct AppState {
@@ -129,7 +129,7 @@ fn resolve_set(
 }
 
 pub fn run_gui(options: super::RunOptions) -> Result<()> {
-    gg_lib::theme::ensure_bundled_themes();
+    jjuicy_lib::theme::ensure_bundled_themes();
 
     let recent_workspaces = options.settings.ui_recent_workspaces();
 
@@ -157,7 +157,7 @@ pub fn run_gui(options: super::RunOptions) -> Result<()> {
                 ])
                 .level(LevelFilter::Warn)
                 .level_for(
-                    "gg",
+                    "jjuicy",
                     if options.debug {
                         LevelFilter::Debug
                     } else {
@@ -165,7 +165,7 @@ pub fn run_gui(options: super::RunOptions) -> Result<()> {
                     },
                 )
                 .level_for(
-                    "gg_lib",
+                    "jjuicy_lib",
                     if options.debug {
                         LevelFilter::Debug
                     } else {
@@ -296,7 +296,7 @@ fn forward_accelerator(window: Window, state: State<AppState>, key: char, ctrl: 
             if state.get_selection(window.label()).is_some() {
                 handler::nonfatal!(window.emit_to(
                     EventTarget::window(window.label()),
-                    "gg://menu/revision",
+                    "jjuicy://menu/revision",
                     "new_child"
                 ));
             }
@@ -318,7 +318,7 @@ fn forward_accelerator(window: Window, state: State<AppState>, key: char, ctrl: 
                 {
                     handler::nonfatal!(window.emit_to(
                         EventTarget::window(window.label()),
-                        "gg://menu/revision",
+                        "jjuicy://menu/revision",
                         "new_parent"
                     ));
                 }
@@ -862,11 +862,11 @@ pub fn try_create_window(
 
     // inject theme CSS before the frontend mounts, so even error/timeout
     // states have styling
-    let theme_css = gg_lib::theme::generate_css(&settings);
+    let theme_css = jjuicy_lib::theme::generate_css(&settings);
     let init_script = format!(
         r#"(() => {{
             let s = document.createElement("style");
-            s.id = "gg-theme";
+            s.id = "ju-theme";
             s.textContent = {css_json};
             (document.head || document.documentElement).appendChild(s);
         }})()"#,
@@ -879,7 +879,7 @@ pub fn try_create_window(
         &label,
         tauri::WebviewUrl::App("index.html".into()),
     )
-    .title("GG - Gui for JJ")
+    .title("jjuicy")
     .inner_size(1280.0, 720.0)
     .focused(true)
     .visible(false)
@@ -935,7 +935,7 @@ pub fn try_create_window(
     let windows = app_state.windows.clone();
     let handle = app_handle.clone();
     let label = window.label().to_owned();
-    window.listen("gg://revision/select", move |event| {
+    window.listen("jjuicy://revision/select", move |event| {
         let payload: Result<Option<messages::RevSet>, serde_json::Error> =
             serde_json::from_str(event.payload());
         if let Ok(set) = payload {
@@ -998,7 +998,7 @@ async fn worker_thread(
         // it's ok if the worker has to restart, as long as we can notify the frontend of it
         handler::fatal!(window.emit_to(
             EventTarget::labeled(window.label()),
-            "gg://repo/config",
+            "jjuicy://repo/config",
             messages::RepoConfig::WorkerError {
                 message: format!("{err:#}"),
             },
@@ -1010,7 +1010,7 @@ fn reopen_repository(window: &Window, wd: PathBuf) -> Result<()> {
     if let Some(config) = try_reopen_repository(window, wd)? {
         window.emit_to(
             EventTarget::window(window.label()),
-            "gg://repo/config",
+            "jjuicy://repo/config",
             config,
         )?;
     }
@@ -1074,7 +1074,7 @@ fn try_open_repository(window: &Window, cwd: Option<PathBuf>) -> Result<messages
             app_state.set_has_workspace(window.label(), true);
 
             let workspace_path = absolute_path.0.clone();
-            _ = window.set_title((String::from("GG - ") + workspace_path.as_str()).as_str());
+            _ = window.set_title((String::from("jjuicy - ") + workspace_path.as_str()).as_str());
 
             // update config and jump lists - this can be slow
             if *track_recent_workspaces {
@@ -1087,7 +1087,7 @@ fn try_open_repository(window: &Window, cwd: Option<PathBuf>) -> Result<messages
         _ => {
             app_state.set_has_workspace(window.label(), false);
 
-            let _ = window.set_title("GG - Gui for JJ");
+            let _ = window.set_title("jjuicy");
         }
     }
 
@@ -1149,7 +1149,7 @@ fn handle_window_event(window: &Window, event: &WindowEvent) -> Result<()> {
                 menu::handle_selection(menu, headers.as_deref(), ignore_immutable)?;
             }
 
-            window.emit_to(EventTarget::labeled(window.label()), "gg://focus", ())?;
+            window.emit_to(EventTarget::labeled(window.label()), "jjuicy://focus", ())?;
         }
         _ => (),
     }
@@ -1165,7 +1165,7 @@ fn add_recent_workspaces(window: Window, workspace_path: String) -> Result<()> {
     let (read_tx, read_rx) = channel();
     session_tx.send(SessionEvent::ReadConfigArray {
         key: vec![
-            "gg".to_string(),
+            "jjuicy".to_string(),
             "ui".to_string(),
             "recent-workspaces".to_string(),
         ],
@@ -1206,7 +1206,7 @@ fn add_recent_workspaces(window: Window, workspace_path: String) -> Result<()> {
 
     session_tx.send(SessionEvent::WriteConfigArray {
         key: vec![
-            "gg".to_string(),
+            "jjuicy".to_string(),
             "ui".to_string(),
             "recent-workspaces".to_string(),
         ],
@@ -1227,7 +1227,7 @@ fn query_recent_workspaces(
     session_tx
         .send(SessionEvent::ReadConfigArray {
             key: vec![
-                "gg".to_string(),
+                "jjuicy".to_string(),
                 "ui".to_string(),
                 "recent-workspaces".to_string(),
             ],

@@ -637,7 +637,10 @@ mod conflict_chain_ranges {
         assert!(
             conflict_change.is_some(),
             "Expected change for conflict_chain.txt, got: {:?}",
-            changes.iter().map(|c| &c.path.repo_path).collect::<Vec<_>>()
+            changes
+                .iter()
+                .map(|c| &c.path.repo_path)
+                .collect::<Vec<_>>()
         );
         assert!(
             conflict_change.unwrap().has_conflict,
