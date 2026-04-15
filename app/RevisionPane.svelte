@@ -13,7 +13,7 @@
     import Zone from "./objects/Zone.svelte";
     import { onEvent } from "./ipc";
     import AuthorSpan from "./controls/AuthorSpan.svelte";
-    import ListWidget, { type List } from "./controls/ListWidget.svelte";
+
     import SetSpan from "./controls/SetSpan.svelte";
     import type { RevChange } from "./messages/RevChange";
     import TimestampSpan from "./controls/TimestampSpan.svelte";
@@ -21,7 +21,34 @@
 
     export let revs: Extract<RevsResult, { type: "Detail" }>;
 
-    const CONTEXT = 3;
+    let expandedFiles = new Set<string>();
+
+    let changeIds = new Map<string, string>();
+    $: {
+        changeIds.clear();
+        for (let change of syntheticChanges) {
+            changeIds.set(`Change-${change.path.repo_path}`, change.path.repo_path);
+        }
+    }
+
+    function onChangesClick(event: MouseEvent) {
+        // walk up from the click target to find a ChangeObject button by its id
+        let el = event.target as HTMLElement | null;
+        while (el && el !== event.currentTarget) {
+            let path = el.id ? changeIds.get(el.id) : undefined;
+            if (path) {
+                if (expandedFiles.has(path)) {
+                    expandedFiles.delete(path);
+                } else {
+                    expandedFiles.add(path);
+                }
+                expandedFiles = expandedFiles;
+                return;
+            }
+            el = el.parentElement;
+        }
+    }
+
 
     // headers are in descendant-first order
     $: singleton = revs.set.from.commit.hex == revs.set.to.commit.hex;
@@ -82,38 +109,7 @@
         changeSelectEvent.set(syntheticChanges[0]);
     }
 
-    let list: List = {
-        getSize() {
-            return syntheticChanges.length;
-        },
-        getSelection() {
-            let index =
-                syntheticChanges.findIndex((row) => row.path.repo_path == $changeSelectEvent?.path.repo_path) ?? -1;
-            return { from: index, to: index };
-        },
-        selectRow(row: number) {
-            $changeSelectEvent = syntheticChanges[row];
-        },
-        extendSelection(row: number) {
-            $changeSelectEvent = syntheticChanges[row];
-        },
-        editRow(row: number) {},
-    };
-
     onEvent<string>("gg://menu/revision", (event) => mutator.handle(event));
-
-    function minLines(change: RevChange): number {
-        // let total = 0;
-        // for (let hunk of change.hunks) {
-        //     total += Math.min(hunk.lines.lines.length, CONTEXT * 2 + 1) + 1;
-        // }
-        // return total;
-        let max = 0;
-        for (let hunk of change.hunks) {
-            max = Math.max(hunk.lines.lines.length, max);
-        }
-        return Math.min(max, CONTEXT * 2 + 1);
-    }
 
     function lineColour(line: string): string | null {
         if (line.startsWith("+")) {
@@ -282,33 +278,31 @@
                 {/if}
             </div>
 
-            <ListWidget {list} type="Change" descendant={$changeSelectEvent?.path.repo_path}>
-                <div class="changes">
-                    {#each syntheticChanges as change}
-                        <!-- XXX implement, somehow, plural squash/restore -->
-                        <ChangeObject
-                            {change}
-                            headers={revs.headers}
-                            selected={$changeSelectEvent?.path?.repo_path === change.path.repo_path} />
-                        {#if $changeSelectEvent?.path?.repo_path === change.path.repo_path}
-                            <div class="change" style="--lines: {minLines(change)}" tabindex="-1">
-                                {#each change.hunks as hunk}
-                                    {#if !change.has_conflict}
+            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+            <div class="changes" on:click={onChangesClick}>
+                {#each syntheticChanges as change}
+                    <ChangeObject
+                        {change}
+                        headers={revs.headers}
+                        selected={$changeSelectEvent?.path?.repo_path === change.path.repo_path} />
+                    {#if expandedFiles.has(change.path.repo_path)}
+                        <div class="change">
+                            {#each change.hunks as hunk}
+                                {#if !change.has_conflict}
                                     <div class="hunk">
                                         <HunkObject header={singleton ? newest : null} path={change.path} {hunk} />
                                     </div>
-                                    {/if}
-                                    <pre class="diff">{#each segmentHunk(hunk.lines.lines) as segment}{#if segment.conflict}<span class="conflict-region">{#each segment.lines as line}{#if isConflictMarker(line)}<span class="conflict-marker">{line}</span>{:else}<span class={lineColour(line)}
-                                                >{line}</span
-                                            >{/if}{/each}</span>{:else}{#each segment.lines as line}<span class={lineColour(line)}
-                                                >{line}</span
-                                            >{/each}{/if}{/each}</pre>
-                                {/each}
-                            </div>
-                        {/if}
-                    {/each}
-                </div>
-            </ListWidget>
+                                {/if}
+                                <pre class="diff">{#each segmentHunk(hunk.lines.lines) as segment}{#if segment.conflict}<span class="conflict-region">{#each segment.lines as line}{#if isConflictMarker(line)}<span class="conflict-marker">{line}</span>{:else}<span class={lineColour(line)}
+                                            >{line}</span
+                                        >{/if}{/each}</span>{:else}{#each segment.lines as line}<span class={lineColour(line)}
+                                            >{line}</span
+                                        >{/each}{/if}{/each}</pre>
+                            {/each}
+                        </div>
+                    {/if}
+                {/each}
+            </div>
         {:else}
             <div class="move-commands">
                 <span>Changes: <span class="no-changes">(empty)</span></span>
@@ -343,12 +337,28 @@
 
     .body {
         height: 100%;
-        overflow: hidden;
+        overflow-x: hidden;
+        overflow-y: auto;
+        pointer-events: auto;
+        scrollbar-color: var(--ctp-text) var(--ctp-crust);
         display: flex;
         flex-direction: column;
         margin: 0 -6px -3px -6px;
         padding: 0 6px 3px 6px;
         gap: 0;
+    }
+
+    .body::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .body::-webkit-scrollbar-thumb {
+        background-color: var(--ctp-text);
+        border-radius: 6px;
+    }
+
+    .body::-webkit-scrollbar-track {
+        background-color: var(--ctp-crust);
     }
 
     .description {
@@ -359,7 +369,6 @@
 
     .description-list {
         min-height: 90px;
-        overflow: auto;
         pointer-events: auto;
 
         border: 1px solid transparent;
@@ -430,48 +439,12 @@
         display: flex;
         flex-direction: column;
         pointer-events: auto;
-        overflow-x: hidden;
-        overflow-y: auto;
-        scrollbar-color: var(--ctp-text) var(--ctp-crust);
-        flex: 1;
-        min-height: 0;
-    }
-
-    .changes::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .changes::-webkit-scrollbar-thumb {
-        background-color: var(--ctp-text);
-        border-radius: 6px;
-    }
-
-    .changes::-webkit-scrollbar-track {
-        background-color: var(--ctp-crust);
     }
 
     .change {
         font-size: small;
         margin: 0;
         pointer-events: auto;
-        overflow-x: auto;
-        overflow-y: scroll;
-        scrollbar-color: var(--ctp-text) var(--ctp-base);
-        min-height: calc(var(--lines) * 1em);
-    }
-
-    .change::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-    }
-
-    .change::-webkit-scrollbar-thumb {
-        background-color: var(--ctp-text);
-        border-radius: 6px;
-    }
-
-    .change::-webkit-scrollbar-track {
-        background-color: var(--ctp-base);
     }
 
     .hunk {
