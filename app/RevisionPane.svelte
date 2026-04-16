@@ -93,7 +93,7 @@
                 kind: "None",
                 path: conflict.path,
                 has_conflict: true,
-                hunks: [conflict.hunk],
+                hunks: conflict.hunks,
             })),
         )
         .sort((a, b) => a.path.relative_path.localeCompare(b.path.relative_path));
@@ -288,11 +288,12 @@
                     {#if expandedFiles.has(change.path.repo_path)}
                         <div class="change">
                             {#each change.hunks as hunk}
-                                {#if !change.has_conflict}
-                                    <div class="hunk">
-                                        <HunkObject header={singleton ? newest : null} path={change.path} {hunk} />
-                                    </div>
-                                {/if}
+                                <div class="hunk">
+                                    <HunkObject
+                                        header={!change.has_conflict && singleton ? newest : null}
+                                        path={change.path}
+                                        {hunk} />
+                                </div>
                                 <pre class="diff">{#each segmentHunk(hunk.lines.lines) as segment}{#if segment.conflict}<span class="conflict-region">{#each segment.lines as line}{#if isConflictMarker(line)}<span class="conflict-marker">{line}</span>{:else}<span class={lineColour(line)}
                                             >{line}</span
                                         >{/if}{/each}</span>{:else}{#each segment.lines as line}<span class={lineColour(line)}

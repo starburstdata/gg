@@ -140,7 +140,7 @@ async fn revision_with_conflict() -> Result<()> {
     // The conflict hunks should show base as deletions and sides as additions
     let conflict_lines: Vec<&str> = conflicts
         .iter()
-        .flat_map(|c| &c.hunk.lines.lines)
+        .flat_map(|c| c.hunks.iter().flat_map(|h| &h.lines.lines))
         .map(|l| l.as_str())
         .collect();
 
@@ -472,7 +472,7 @@ async fn inherited_conflict_persists() -> Result<()> {
     // The conflict hunks should show base as deletions and sides as additions
     let conflict_lines: Vec<&str> = conflicts
         .iter()
-        .flat_map(|c| &c.hunk.lines.lines)
+        .flat_map(|c| c.hunks.iter().flat_map(|h| &h.lines.lines))
         .map(|l| l.as_str())
         .collect();
 

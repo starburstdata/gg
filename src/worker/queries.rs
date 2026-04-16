@@ -368,11 +368,11 @@ pub async fn query_revisions(ws: &WorkspaceSession<'_>, set: RevSet) -> Result<R
                             same_change: SameChange::Accept,
                         },
                     );
-                    let hunk = format_conflict_hunks(merge_result, &file.labels)?;
-                    if !hunk.lines.lines.is_empty() {
+                    let hunks = format_conflict_hunks(merge_result, &file.labels, 3)?;
+                    if !hunks.is_empty() {
                         conflicts.push(RevConflict {
                             path: formatted_path,
-                            hunk,
+                            hunks,
                         });
                     }
                 }
@@ -483,7 +483,7 @@ async fn format_tree_changes(
                             same_change: SameChange::Accept,
                         },
                     );
-                    vec![format_conflict_hunks(merge_result, &file.labels)?]
+                    format_conflict_hunks(merge_result, &file.labels, 3)?
                 }
                 other => {
                     let before_value = conflicts::materialize_tree_value(
@@ -588,131 +588,258 @@ async fn get_value_contents(path: &RepoPath, value: MaterializedTreeValue) -> Re
     }
 }
 
-/// render a conflict as a diff: base content as deletions, sides as additions,
-/// resolved hunks as context. each section is labeled with the conflict label.
-fn format_conflict_hunks(merge_result: MergeResult, labels: &ConflictLabels) -> Result<ChangeHunk> {
-    let mut lines = Vec::new();
-
+/// render a conflict as a sequence of diff hunks: base content as deletions,
+/// sides as additions, resolved content as context. resolved regions are
+/// trimmed to `num_context_lines` around each conflict; if too much resolved
+/// content sits between two conflicts, the hunk is split so each carries its
+/// own `@@ -a,b +c,d @@` header.
+fn format_conflict_hunks(
+    merge_result: MergeResult,
+    labels: &ConflictLabels,
+    num_context_lines: usize,
+) -> Result<Vec<ChangeHunk>> {
     let hunks = match merge_result {
         MergeResult::Resolved(content) => {
+            let mut lines = Vec::new();
             for line in String::from_utf8_lossy(&content).lines() {
                 lines.push(format!(" {line}\n"));
             }
             let len = lines.len();
-            return Ok(ChangeHunk {
+            if len == 0 {
+                return Ok(Vec::new());
+            }
+            return Ok(vec![ChangeHunk {
                 location: ChangeLocation {
-                    from_file: ChangeRange { start: 0, len },
-                    to_file: ChangeRange { start: 0, len },
+                    from_file: ChangeRange { start: 1, len },
+                    to_file: ChangeRange { start: 1, len },
                 },
                 lines: MultilineString { lines },
-            });
+            }]);
         }
         MergeResult::Conflict(hunks) => hunks,
     };
 
     let num_conflicts = hunks.iter().filter(|h| !h.is_resolved()).count();
+    let mut out: Vec<ChangeHunk> = Vec::new();
+    let mut pending_resolved: Vec<String> = Vec::new();
+    let mut from_cursor: usize = 0;
+    let mut to_cursor: usize = 0;
+    let mut current: Option<PendingHunk> = None;
     let mut conflict_idx = 0;
-    let mut from_len = 0;
-    let mut to_len = 0;
+
     for hunk in &hunks {
         if let Some(content) = hunk.resolve_trivial(SameChange::Accept) {
             for line in String::from_utf8_lossy(content).lines() {
-                lines.push(format!(" {line}\n"));
-                from_len += 1;
-                to_len += 1;
+                pending_resolved.push(format!(" {line}\n"));
             }
-        } else {
-            conflict_idx += 1;
+            continue;
+        }
 
-            // when one side is empty (edit-vs-delete), show a diff between
-            // base and the non-empty side instead of the raw merge output
-            let adds: Vec<_> = hunk.adds().collect();
-            let removes: Vec<_> = hunk.removes().collect();
-            if removes.len() == 1 && adds.len() == 2 {
-                let empty_idx = adds.iter().position(|s| s.is_empty());
-                if let Some(empty_idx) = empty_idx {
-                    let other_idx = 1 - empty_idx;
-                    let deleted_label = labels.get_add(empty_idx).map_or_else(
-                        || format!("side {}", empty_idx + 1),
-                        |l| format!("side {} ({l})", empty_idx + 1),
-                    );
-                    let kept_label = labels.get_add(other_idx).map_or_else(
-                        || format!("side {}", other_idx + 1),
-                        |l| format!("side {} ({l})", other_idx + 1),
-                    );
-                    lines.push(format!(
-                        " <<<<<<< conflict {conflict_idx} of {num_conflicts} \
-                         — deleted by {deleted_label}\n"
-                    ));
-                    let base_content = removes[0];
-                    let side_content = adds[other_idx];
-                    let diff_hunks = get_unified_hunks(3, base_content.as_ref(), side_content.as_ref())?;
-                    if diff_hunks.is_empty() {
-                        // base and kept side are identical
-                        lines.push(format!(" +++++++ {kept_label} (unchanged)\n"));
-                        for line in String::from_utf8_lossy(side_content).lines() {
-                            lines.push(format!(" {line}\n"));
-                            from_len += 1;
-                            to_len += 1;
-                        }
-                    } else {
-                        lines.push(format!(" +++++++ {kept_label}\n"));
-                        for diff_hunk in &diff_hunks {
-                            for line in &diff_hunk.lines.lines {
-                                lines.push(line.clone());
-                                if line.starts_with('-') {
-                                    from_len += 1;
-                                } else if line.starts_with('+') {
-                                    to_len += 1;
-                                } else {
-                                    from_len += 1;
-                                    to_len += 1;
-                                }
-                            }
+        flush_before_conflict(
+            &mut out,
+            &mut current,
+            &mut pending_resolved,
+            &mut from_cursor,
+            &mut to_cursor,
+            num_context_lines,
+        );
+        let cur = current.as_mut().expect("hunk must exist after flush");
+        conflict_idx += 1;
+
+        // when one side is empty (edit-vs-delete), show a diff between
+        // base and the non-empty side instead of the raw merge output
+        let adds: Vec<_> = hunk.adds().collect();
+        let removes: Vec<_> = hunk.removes().collect();
+        if removes.len() == 1
+            && adds.len() == 2
+            && let Some(empty_idx) = adds.iter().position(|s| s.is_empty())
+        {
+            let other_idx = 1 - empty_idx;
+            let deleted_label = labels.get_add(empty_idx).map_or_else(
+                || format!("side {}", empty_idx + 1),
+                |l| format!("side {} ({l})", empty_idx + 1),
+            );
+            let kept_label = labels.get_add(other_idx).map_or_else(
+                || format!("side {}", other_idx + 1),
+                |l| format!("side {} ({l})", other_idx + 1),
+            );
+            cur.lines.push(format!(
+                " <<<<<<< conflict {conflict_idx} of {num_conflicts} \
+                 — deleted by {deleted_label}\n"
+            ));
+            let base_content = removes[0];
+            let side_content = adds[other_idx];
+            let diff_hunks =
+                get_unified_hunks(3, base_content.as_ref(), side_content.as_ref())?;
+            if diff_hunks.is_empty() {
+                // base and kept side are identical
+                cur.lines.push(format!(" +++++++ {kept_label} (unchanged)\n"));
+                for line in String::from_utf8_lossy(side_content).lines() {
+                    cur.lines.push(format!(" {line}\n"));
+                    cur.from_len += 1;
+                    cur.to_len += 1;
+                    from_cursor += 1;
+                    to_cursor += 1;
+                }
+            } else {
+                cur.lines.push(format!(" +++++++ {kept_label}\n"));
+                for diff_hunk in &diff_hunks {
+                    for line in &diff_hunk.lines.lines {
+                        cur.lines.push(line.clone());
+                        if line.starts_with('-') {
+                            cur.from_len += 1;
+                            from_cursor += 1;
+                        } else if line.starts_with('+') {
+                            cur.to_len += 1;
+                            to_cursor += 1;
+                        } else {
+                            cur.from_len += 1;
+                            cur.to_len += 1;
+                            from_cursor += 1;
+                            to_cursor += 1;
                         }
                     }
-                    lines.push(format!(
-                        " >>>>>>> conflict {conflict_idx} of {num_conflicts}\n"
-                    ));
-                    continue;
                 }
             }
+            cur.lines.push(format!(
+                " >>>>>>> conflict {conflict_idx} of {num_conflicts}\n"
+            ));
+            continue;
+        }
 
-            lines.push(format!(" <<<<<<< conflict {conflict_idx} of {num_conflicts}\n"));
-            for base in hunk.removes() {
-                for line in String::from_utf8_lossy(base).lines() {
-                    lines.push(format!("-{line}\n"));
-                    from_len += 1;
-                }
+        cur.lines.push(format!(
+            " <<<<<<< conflict {conflict_idx} of {num_conflicts}\n"
+        ));
+        for base in hunk.removes() {
+            for line in String::from_utf8_lossy(base).lines() {
+                cur.lines.push(format!("-{line}\n"));
+                cur.from_len += 1;
+                from_cursor += 1;
             }
-            for (i, side) in hunk.adds().enumerate() {
-                let label = labels.get_add(i).map_or_else(
-                    || format!(" +++++++ side {}\n", i + 1),
-                    |l| format!(" +++++++ side {} ({l})\n", i + 1),
-                );
-                lines.push(label);
-                for line in String::from_utf8_lossy(side).lines() {
-                    lines.push(format!("+{line}\n"));
-                    to_len += 1;
-                }
+        }
+        for (i, side) in hunk.adds().enumerate() {
+            let label = labels.get_add(i).map_or_else(
+                || format!(" +++++++ side {}\n", i + 1),
+                |l| format!(" +++++++ side {} ({l})\n", i + 1),
+            );
+            cur.lines.push(label);
+            for line in String::from_utf8_lossy(side).lines() {
+                cur.lines.push(format!("+{line}\n"));
+                cur.to_len += 1;
+                to_cursor += 1;
             }
-            lines.push(format!(" >>>>>>> conflict {conflict_idx} of {num_conflicts}\n"));
+        }
+        cur.lines.push(format!(
+            " >>>>>>> conflict {conflict_idx} of {num_conflicts}\n"
+        ));
+    }
+
+    // trailing resolved context: keep at most `num_context_lines`, discard the rest
+    if let Some(ref mut cur) = current {
+        let keep = num_context_lines.min(pending_resolved.len());
+        for line in pending_resolved.drain(..keep) {
+            cur.lines.push(line);
+            cur.from_len += 1;
+            cur.to_len += 1;
+        }
+    }
+    if let Some(cur) = current {
+        out.push(cur.into_change_hunk());
+    }
+
+    Ok(out)
+}
+
+struct PendingHunk {
+    from_start: usize, // 0-based absolute position at hunk start
+    to_start: usize,
+    lines: Vec<String>,
+    from_len: usize,
+    to_len: usize,
+}
+
+impl PendingHunk {
+    fn new(from_start: usize, to_start: usize) -> Self {
+        Self {
+            from_start,
+            to_start,
+            lines: Vec::new(),
+            from_len: 0,
+            to_len: 0,
         }
     }
 
-    Ok(ChangeHunk {
-        location: ChangeLocation {
-            from_file: ChangeRange {
-                start: 0,
-                len: from_len,
+    fn into_change_hunk(self) -> ChangeHunk {
+        ChangeHunk {
+            location: ChangeLocation {
+                from_file: ChangeRange {
+                    start: self.from_start + 1,
+                    len: self.from_len,
+                },
+                to_file: ChangeRange {
+                    start: self.to_start + 1,
+                    len: self.to_len,
+                },
             },
-            to_file: ChangeRange {
-                start: 0,
-                len: to_len,
-            },
-        },
-        lines: MultilineString { lines },
-    })
+            lines: MultilineString { lines: self.lines },
+        }
+    }
+}
+
+/// before emitting a conflict, flush buffered resolved-trivial lines.
+/// keeps up to `num_context_lines` adjacent to each conflict; if the gap
+/// between two conflicts exceeds `2 * num_context_lines`, splits the current
+/// hunk and starts a new one so each has its own header.
+fn flush_before_conflict(
+    out: &mut Vec<ChangeHunk>,
+    current: &mut Option<PendingHunk>,
+    pending: &mut Vec<String>,
+    from_cursor: &mut usize,
+    to_cursor: &mut usize,
+    num_context_lines: usize,
+) {
+    let n = pending.len();
+
+    if let Some(cur) = current {
+        if n <= 2 * num_context_lines {
+            for line in pending.drain(..) {
+                cur.lines.push(line);
+                cur.from_len += 1;
+                cur.to_len += 1;
+                *from_cursor += 1;
+                *to_cursor += 1;
+            }
+            return;
+        }
+
+        for line in pending.drain(..num_context_lines) {
+            cur.lines.push(line);
+            cur.from_len += 1;
+            cur.to_len += 1;
+            *from_cursor += 1;
+            *to_cursor += 1;
+        }
+        let skip = n - 2 * num_context_lines;
+        pending.drain(..skip);
+        *from_cursor += skip;
+        *to_cursor += skip;
+        out.push(current.take().unwrap().into_change_hunk());
+    } else if n > num_context_lines {
+        let skip = n - num_context_lines;
+        pending.drain(..skip);
+        *from_cursor += skip;
+        *to_cursor += skip;
+    }
+
+    let mut new_hunk = PendingHunk::new(*from_cursor, *to_cursor);
+    for line in pending.drain(..) {
+        new_hunk.lines.push(line);
+        new_hunk.from_len += 1;
+        new_hunk.to_len += 1;
+        *from_cursor += 1;
+        *to_cursor += 1;
+    }
+    *current = Some(new_hunk);
 }
 
 fn get_unified_hunks(

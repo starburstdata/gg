@@ -18,7 +18,7 @@ pub struct RevChange {
 #[cfg_attr(feature = "ts-rs", derive(TS), ts(export, export_to = "app/messages/"))]
 pub struct RevConflict {
     pub path: TreePath,
-    pub hunk: ChangeHunk,
+    pub hunks: Vec<ChangeHunk>,
 }
 
 /// The type of modification made to a file in a diff.
