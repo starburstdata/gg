@@ -60,6 +60,11 @@ struct Args {
     #[arg(long, global = true)]
     ignore_immutable: bool,
 
+    /// Start a new GG process even if one is already running. Without this flag,
+    /// CLI invocations attach to an existing instance when available.
+    #[arg(long, global = true)]
+    new_instance: bool,
+
     #[arg(
         long,
         global = true,
@@ -132,10 +137,42 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
+    // hand off to an already-running GUI instance if possible
+    if !args.new_instance
+        && !args.foreground
+        && !matches!(args.mode(), Some(LaunchMode::Web))
+        && try_attach_existing(&args)
+    {
+        return Ok(());
+    }
+
     if !args.foreground && should_spawn() {
         spawn_app()
     } else {
         run_app(args)
+    }
+}
+
+/// Resolve the workspace argument (or cwd) to an absolute canonical path.
+/// Falls back to the raw value so that non-existent paths can still produce
+/// a useful error message from the server.
+fn canonical_workspace(args: &Args) -> Option<PathBuf> {
+    let raw = args.workspace().or_else(|| std::env::current_dir().ok())?;
+    Some(dunce::canonicalize(&raw).unwrap_or(raw))
+}
+
+fn try_attach_existing(args: &Args) -> bool {
+    let request = gui::single_instance::OpenRequest {
+        workspace: canonical_workspace(args),
+        ignore_immutable: args.ignore_immutable,
+    };
+    match gui::single_instance::try_attach(&request) {
+        Ok(true) => true,
+        Ok(false) => false,
+        Err(err) => {
+            log::warn!("attach to existing instance failed: {:#}", err);
+            false
+        }
     }
 }
 

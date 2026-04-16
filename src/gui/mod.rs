@@ -2,6 +2,7 @@ mod handler;
 mod menu;
 #[cfg(target_os = "macos")]
 mod recent_items;
+pub mod single_instance;
 mod sink;
 
 use std::collections::HashMap;
@@ -20,6 +21,7 @@ use tauri::ipc::InvokeError;
 use tauri::menu::Menu;
 use tauri::webview::WebviewWindowBuilder;
 use tauri::{AppHandle, Emitter, EventTarget, Listener, Manager, State, Window, WindowEvent, Wry};
+use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_window_state::StateFlags;
 
 use gg_lib::config::GGSettings;
@@ -144,6 +146,13 @@ pub fn run_gui(options: super::RunOptions) -> Result<()> {
         )
         .plugin(
             tauri_plugin_log::Builder::default()
+                // route log output to stderr, not stdout — spawn_app() pipes stdout
+                // to signal startup completion and closes it afterwards, so any later
+                // write panics with EPIPE
+                .targets([
+                    Target::new(TargetKind::Stderr),
+                    Target::new(TargetKind::LogDir { file_name: None }),
+                ])
                 .level(LevelFilter::Warn)
                 .level_for(
                     "gg",
@@ -234,11 +243,23 @@ pub fn run_gui(options: super::RunOptions) -> Result<()> {
             let has_window = false;
 
             if !has_window {
-                try_create_window(app.handle(), options.workspace.clone())?;
+                try_create_window(app.handle(), options.workspace.clone(), None)?;
+            }
+
+            // listen for CLI invocations in other terminals; failure is non-fatal
+            // (eg. if another instance raced us to the socket after our attach check)
+            match single_instance::start_server(app.handle().clone()) {
+                Ok(server) => {
+                    app.manage(server);
+                }
+                Err(err) => log::warn!("single-instance server not started: {:#}", err),
             }
 
             if options.is_child {
-                println!("Startup complete.");
+                // deliberately tolerant of EPIPE: the parent reads one line then exits,
+                // so a racing write (eg. from a log target) can close the pipe first
+                use std::io::Write;
+                let _ = writeln!(std::io::stdout(), "Startup complete.");
             }
 
             Ok(())
@@ -820,7 +841,11 @@ fn write_config_table(
     Ok(())
 }
 
-pub fn try_create_window(app_handle: &AppHandle, workspace: Option<PathBuf>) -> Result<()> {
+pub fn try_create_window(
+    app_handle: &AppHandle,
+    workspace: Option<PathBuf>,
+    ignore_immutable: Option<bool>,
+) -> Result<()> {
     log::debug!("try_create_window: {:?}", workspace);
 
     let label = label_for_path(workspace.as_ref());
@@ -849,7 +874,7 @@ pub fn try_create_window(app_handle: &AppHandle, workspace: Option<PathBuf>) -> 
     // create a worker for the specified path
     let (sender, receiver) = channel();
 
-    let initial_ignore_immutable = app_state.initial_ignore_immutable;
+    let initial_ignore_immutable = ignore_immutable.unwrap_or(app_state.initial_ignore_immutable);
     let enable_askpass = app_state.enable_askpass;
     let handle = window.as_ref().window();
     let window_worker = thread::spawn(move || {
@@ -983,7 +1008,9 @@ fn try_reopen_repository(window: &Window, wd: PathBuf) -> Result<Option<messages
     if state.get_has_workspace(window.label()) {
         let app = window.app_handle().clone();
         tauri::async_runtime::spawn(async move {
-            handler::nonfatal!(try_create_window(&app, Some(wd)).context("try_create_window"));
+            handler::nonfatal!(
+                try_create_window(&app, Some(wd), None).context("try_create_window")
+            );
         });
         Ok(None)
     } else {
