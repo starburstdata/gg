@@ -68,6 +68,11 @@ pub enum LogLine {
         source: LogCoordinates,
         target: LogCoordinates,
         indirect: bool,
+        /// For rescue sweeps: the column where the stem ran before this
+        /// commit swapped it left. The renderer bends twice so the line
+        /// leaves the source toward `via`, runs straight down `via`, then
+        /// bends again to land at `target`.
+        via: Option<usize>,
     },
     ToNode {
         source: LogCoordinates,

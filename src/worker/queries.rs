@@ -46,12 +46,25 @@ use crate::messages::{RevHeader, RevId};
 
 use super::{WorkspaceSession, git_util::get_git_remote_names};
 
-struct LogStem {
+/// A column in the active stem array. Each column is either empty or holds a
+/// stem targeting some commit; the stem "closes" when we process its target,
+/// at which point we place the commit's node at that column.
+///
+/// The layout algorithm is a port of sapling-renderdag's `Renderer`. Stems
+/// carry the source position (where they were created) so when they're
+/// terminated we can emit a single LogLine spanning from child to parent.
+#[derive(Clone)]
+struct Stem {
     source: LogCoordinates,
     target: CommitId,
     indirect: bool,
-    was_inserted: bool,
     known_immutable: bool,
+    /// True once this stem has been swapped into its current slot by a
+    /// rescue sweep. The rescue emits a FromNode that already ends at the
+    /// rescuing commit's row+1 coordinates, so if the stem's target turns
+    /// out to be the very next commit we'd otherwise overlay a second
+    /// ToNode on the same 1-row segment. See step 2 for the skip.
+    rescued: bool,
 }
 
 /// state used for init or restart of a query
@@ -60,8 +73,8 @@ pub struct QueryState {
     page_size: usize,
     /// number of rows already yielded
     next_row: usize,
-    /// ongoing vertical lines; nodes will be placed on or around these
-    stems: Vec<Option<LogStem>>,
+    /// ongoing vertical stems keyed by column; None indicates an empty slot
+    stems: Vec<Option<Stem>>,
 }
 
 impl QueryState {
@@ -126,55 +139,42 @@ impl<'q, 'w> QuerySession<'q, 'w> {
     }
 
     pub fn get_page(&mut self) -> Result<LogPage> {
-        let mut rows: Vec<LogRow> = Vec::with_capacity(self.state.page_size); // output rows to draw
+        let mut rows: Vec<LogRow> = Vec::with_capacity(self.state.page_size);
         let mut row = self.state.next_row;
         let max = row + self.state.page_size;
 
         let root_id = self.ws.repo().store().root_commit_id().clone();
 
         while let Some(Ok((commit_id, commit_edges))) = self.iter.next() {
-            // output lines to draw for the current row
             let mut lines: Vec<LogLine> = Vec::new();
 
-            // find an existing stem targeting the current node
-            let mut column = self.state.stems.len();
+            // 1. find a column for this commit: prefer an existing stem
+            //    targeting it, then the leftmost empty slot, finally a new
+            //    column on the right.
+            let node_col = find_column(&self.state.stems, &commit_id);
+
+            // 2. terminate any stem that was targeting this commit. Emit a
+            //    ToNode line spanning from the stem's source to our position —
+            //    the original, unbroken edge. If the stem was rescued in the
+            //    immediately preceding row, its rescue FromNode already ends
+            //    exactly at our coordinates; skipping the ToNode avoids
+            //    overlaying two lines on the same 1-row segment. Rescues more
+            //    than one row back still need the ToNode to cover the vertical
+            //    run between the rescue endpoint (row+1) and our row.
             let mut stem_known_immutable = false;
-            let mut padding = 0; // used to offset the commit summary past some edges
-
-            if let Some(slot) = self.find_stem_for_commit(&commit_id) {
-                column = slot;
-                padding = self.state.stems.len() - column - 1;
-            }
-
-            // terminate any existing stem, removing it from the end or leaving a gap
-            if column < self.state.stems.len() {
-                if let Some(terminated_stem) = &self.state.stems[column] {
-                    stem_known_immutable = terminated_stem.known_immutable;
-                    lines.push(if terminated_stem.was_inserted {
-                        LogLine::FromNode {
-                            indirect: terminated_stem.indirect,
-                            source: terminated_stem.source,
-                            target: LogCoordinates(column, row),
-                        }
-                    } else {
-                        LogLine::ToNode {
-                            indirect: terminated_stem.indirect,
-                            source: terminated_stem.source,
-                            target: LogCoordinates(column, row),
-                        }
+            if let Some(slot) = self.state.stems.get_mut(node_col).and_then(|s| s.take()) {
+                stem_known_immutable = slot.known_immutable;
+                let rescue_already_covers =
+                    slot.rescued && slot.source.0 == node_col && slot.source.1 + 1 == row;
+                if !rescue_already_covers {
+                    lines.push(LogLine::ToNode {
+                        indirect: slot.indirect,
+                        source: slot.source,
+                        target: LogCoordinates(node_col, row),
                     });
                 }
-                self.state.stems[column] = None;
-            }
-            // otherwise, slot into any gaps that might exist
-            else {
-                for (slot, stem) in self.state.stems.iter().enumerate() {
-                    if stem.is_none() {
-                        column = slot;
-                        padding = self.state.stems.len() - slot - 1;
-                        break;
-                    }
-                }
+            } else if node_col >= self.state.stems.len() {
+                self.state.stems.resize_with(node_col + 1, || None);
             }
 
             let known_immutable = if stem_known_immutable {
@@ -182,70 +182,134 @@ impl<'q, 'w> QuerySession<'q, 'w> {
             } else {
                 Some((self.is_immutable)(&commit_id)?)
             };
-
             let header = self
                 .ws
                 .format_header(&self.ws.get_commit(&commit_id)?, known_immutable)?;
 
-            // remove empty stems on the right edge
-            let empty_stems = self
-                .state
-                .stems
-                .iter()
-                .rev()
-                .take_while(|stem| stem.is_none())
-                .count();
-            self.state
-                .stems
-                .truncate(self.state.stems.len() - empty_stems);
+            // 3. assign each parent edge to a column.
+            //    - Existing stem for this target → emit ToIntersection (merge).
+            //    - Otherwise create a new stem (prefer the commit's own column
+            //      if empty, else the leftmost gap, else push to the right).
+            //    Track the only-parent case so step 4 can rescue it.
+            let mut parent_count = 0usize;
+            let mut single_parent_merge: Option<(usize, usize)> = None;
 
-            // merge edges into existing stems or add new ones to the right
-            let mut next_missing: Option<CommitId> = None;
-            'edges: for edge in commit_edges.iter() {
-                if edge.edge_type == GraphEdgeType::Missing {
-                    if edge.target == root_id {
-                        continue;
-                    } else {
-                        next_missing = Some(edge.target.clone());
-                    }
+            for edge in commit_edges.iter() {
+                if edge.edge_type == GraphEdgeType::Missing && edge.target == root_id {
+                    continue;
                 }
-
+                parent_count += 1;
                 let indirect = edge.edge_type != GraphEdgeType::Direct;
 
-                for (slot, stem) in self.state.stems.iter().enumerate() {
-                    if let Some(stem) = stem
-                        && stem.target == edge.target
-                    {
-                        lines.push(LogLine::ToIntersection {
-                            indirect,
-                            source: LogCoordinates(column, row),
-                            target: LogCoordinates(slot, row + 1),
-                        });
-                        continue 'edges;
+                if let Some(slot) = self
+                    .state
+                    .stems
+                    .iter()
+                    .position(|s| s.as_ref().map(|st| &st.target) == Some(&edge.target))
+                {
+                    let line_idx = lines.len();
+                    lines.push(LogLine::ToIntersection {
+                        indirect,
+                        source: LogCoordinates(node_col, row),
+                        target: LogCoordinates(slot, row + 1),
+                    });
+                    if parent_count == 1 {
+                        single_parent_merge = Some((slot, line_idx));
+                    } else {
+                        single_parent_merge = None;
                     }
+                    continue;
                 }
 
-                for stem in self.state.stems.iter_mut() {
-                    if stem.is_none() {
-                        *stem = Some(LogStem {
-                            source: LogCoordinates(column, row),
-                            target: edge.target.clone(),
-                            indirect,
-                            was_inserted: true,
-                            known_immutable: header.is_immutable,
-                        });
-                        continue 'edges;
-                    }
-                }
-
-                self.state.stems.push(Some(LogStem {
-                    source: LogCoordinates(column, row),
+                // no existing stem — allocate one.
+                let col = if matches!(self.state.stems.get(node_col), Some(None)) {
+                    node_col
+                } else if let Some(i) = self.state.stems.iter().position(|s| s.is_none()) {
+                    i
+                } else {
+                    self.state.stems.push(None);
+                    self.state.stems.len() - 1
+                };
+                self.state.stems[col] = Some(Stem {
+                    source: LogCoordinates(node_col, row),
                     target: edge.target.clone(),
                     indirect,
-                    was_inserted: false,
                     known_immutable: header.is_immutable,
-                }));
+                    rescued: false,
+                });
+                single_parent_merge = None;
             }
+
+            // 4. column rescue (sapling-style): single-parent commits whose
+            //    parent ended up as an existing stem to the right get their
+            //    stem swapped back to the commit's column. The ToIntersection
+            //    we just emitted would land in an empty column after the swap,
+            //    so replace it with a FromNode that sweeps the old stem's
+            //    source into the commit's column — but aiming one row PAST
+            //    the commit so the curve ends below its circle. That way it
+            //    merges into the stem's continuing column rather than
+            //    appearing to terminate at the commit itself (which would
+            //    read as a spurious parent-child edge to the rescuing
+            //    sibling). Fire whenever the stem was created in any prior
+            //    row so the rescue can cascade one lane at a time across
+            //    consecutive sibling merges — matching jj's layout where a
+            //    common-parent stem migrates leftward through each sibling
+            //    instead of jumping across several lanes in one step.
+            if parent_count == 1
+                && let Some((slot, line_idx)) = single_parent_merge
+                && slot > node_col
+                && let Some(stem_ref) = self.state.stems[slot].as_ref()
+                && stem_ref.source.1 < row
+            {
+                let mut stem = self.state.stems[slot].take().expect("rescued stem");
+
+                // Redirect the current row's ToIntersection (emitted just
+                // above) onto the stem's new column so the rescuing commit
+                // keeps its own parent-child arc, pointing at the stem's
+                // continued run below its circle.
+                if let LogLine::ToIntersection { target, .. } = &mut lines[line_idx] {
+                    target.0 = node_col;
+                }
+
+                // Emit the compaction sweep as a separate FromNode. The
+                // logical source stays at the allocator's position (where
+                // the stem was born, often kylr's row 0 col 0) so the line
+                // visually grows out of the allocator's circle. The via
+                // column is the stem's current slot — the renderer bends
+                // right out of the allocator, runs the long vertical at
+                // `via` (an empty lane), then bends left to reach the
+                // rescuing commit. Running the vertical at the allocator's
+                // column instead would slice through every circle on the
+                // trunk; skipping the allocator's position would leave the
+                // top of the line floating in empty space.
+                lines.push(LogLine::FromNode {
+                    indirect: stem.indirect,
+                    source: stem.source,
+                    target: LogCoordinates(node_col, row + 1),
+                    via: Some(slot),
+                });
+                stem.source = LogCoordinates(node_col, row);
+                stem.rescued = true;
+                self.state.stems[node_col] = Some(stem);
+
+                // earlier siblings that merged into this stem emitted
+                // ToIntersection arcs targeting (slot, sibling_row + 1).
+                // Leave those arcs alone: the rescue FromNode's source-
+                // column vertical runs from stem.source.1 down to the
+                // rescue row's boundary, so each sibling's endpoint at
+                // (slot, sibling_row + 1) lies on that vertical and joins
+                // the rescued stem cleanly. Redirecting them to node_col
+                // would run them across the rescuing commit's own circle.
+            }
+
+            // 5. trim trailing empty stems and handle any "missing" edges that
+            //    need a terminator in the next row (Sapling marks these with ~).
+            while matches!(self.state.stems.last(), Some(None)) {
+                self.state.stems.pop();
+            }
+
+            let location = LogCoordinates(node_col, row);
+            let padding = self.state.stems.len().saturating_sub(node_col + 1);
 
             let hidden_forks = self
                 .hidden_forks
@@ -255,28 +319,40 @@ impl<'q, 'w> QuerySession<'q, 'w> {
 
             rows.push(LogRow {
                 revision: header,
-                location: LogCoordinates(column, row),
+                location,
                 padding,
                 lines,
                 hidden_forks,
             });
             row += 1;
 
-            // terminate any temporary stems created for missing edges
-            if let Some(slot) = next_missing
-                .take()
-                .and_then(|id| self.find_stem_for_commit(&id))
-            {
-                if let Some(terminated_stem) = &self.state.stems[slot] {
-                    rows.last_mut().unwrap().lines.push(LogLine::ToMissing {
-                        indirect: terminated_stem.indirect,
-                        source: LogCoordinates(column, row - 1),
-                        target: LogCoordinates(slot, row),
-                    });
+            // missing-parent terminators: any new stem targeting a commit that
+            // isn't actually in the revset (jj tags it Missing non-root) gets
+            // a ~ marker drawn at the next row via ToMissing.
+            let mut next_missing: Option<(usize, bool)> = None;
+            for edge in commit_edges.iter() {
+                if edge.edge_type == GraphEdgeType::Missing
+                    && edge.target != root_id
+                    && let Some(slot) = self
+                        .state
+                        .stems
+                        .iter()
+                        .position(|s| s.as_ref().map(|st| &st.target) == Some(&edge.target))
+                {
+                    let indirect = self.state.stems[slot].as_ref().is_none_or(|s| s.indirect);
+                    next_missing = Some((slot, indirect));
+                    break;
                 }
+            }
+            if let Some((slot, indirect)) = next_missing {
+                rows.last_mut().unwrap().lines.push(LogLine::ToMissing {
+                    indirect,
+                    source: LogCoordinates(node_col, row - 1),
+                    target: LogCoordinates(slot, row),
+                });
                 self.state.stems[slot] = None;
                 row += 1;
-            };
+            }
 
             if row == max {
                 break;
@@ -289,18 +365,19 @@ impl<'q, 'w> QuerySession<'q, 'w> {
             has_more: self.iter.peek().is_some(),
         })
     }
+}
 
-    fn find_stem_for_commit(&self, id: &CommitId) -> Option<usize> {
-        for (slot, stem) in self.state.stems.iter().enumerate() {
-            if let Some(LogStem { target, .. }) = stem
-                && target == id
-            {
-                return Some(slot);
-            }
-        }
-
-        None
+fn find_column(stems: &[Option<Stem>], commit_id: &CommitId) -> usize {
+    if let Some(i) = stems
+        .iter()
+        .position(|s| s.as_ref().map(|st| &st.target) == Some(commit_id))
+    {
+        return i;
     }
+    if let Some(i) = stems.iter().position(|s| s.is_none()) {
+        return i;
+    }
+    stems.len()
 }
 
 #[cfg(test)]
