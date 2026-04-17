@@ -360,10 +360,12 @@
                     enhancedRow.passingLines.push(enhancedLine);
                     passNextRow.push(enhancedLine);
                 } else {
-                    // other lines end at their owning row, so we need to add them to all previous rows and then this one
+                    // other lines end at their owning row, so we need to add them to all previous rows and then this one.
+                    // a rescue FromNode targets one row past its owner so the curve ends below the rescuing commit's
+                    // circle; cap the loop at already-built rows so we don't dereference the in-progress one.
                     enhancedLine.parent = row.revision;
                     enhancedLine.child = graph[line.source[1]].revision;
-                    for (let i = line.source[1]; i < line.target[1]; i++) {
+                    for (let i = line.source[1]; i < line.target[1] && i < graph.length; i++) {
                         graph[i].passingLines.push(enhancedLine);
                     }
                     enhancedRow.passingLines.push(enhancedLine);
