@@ -50,7 +50,6 @@ struct LogStem {
     source: LogCoordinates,
     target: CommitId,
     indirect: bool,
-    was_inserted: bool,
     known_immutable: bool,
 }
 
@@ -145,18 +144,10 @@ impl<'q, 'w> QuerySession<'q, 'w> {
             if column < self.state.stems.len() {
                 if let Some(terminated_stem) = &self.state.stems[column] {
                     stem_known_immutable = terminated_stem.known_immutable;
-                    lines.push(if terminated_stem.was_inserted {
-                        LogLine::FromNode {
-                            indirect: terminated_stem.indirect,
-                            source: terminated_stem.source,
-                            target: LogCoordinates(column, row),
-                        }
-                    } else {
-                        LogLine::ToNode {
-                            indirect: terminated_stem.indirect,
-                            source: terminated_stem.source,
-                            target: LogCoordinates(column, row),
-                        }
+                    lines.push(LogLine::ToNode {
+                        indirect: terminated_stem.indirect,
+                        source: terminated_stem.source,
+                        target: LogCoordinates(column, row),
                     });
                 }
                 self.state.stems[column] = None;
@@ -224,24 +215,24 @@ impl<'q, 'w> QuerySession<'q, 'w> {
                     }
                 }
 
-                for stem in self.state.stems.iter_mut() {
-                    if stem.is_none() {
-                        *stem = Some(LogStem {
-                            source: LogCoordinates(column, row),
-                            target: edge.target.clone(),
-                            indirect,
-                            was_inserted: true,
-                            known_immutable: header.is_immutable,
-                        });
-                        continue 'edges;
-                    }
+                // prefer the current commit's column when it's free, so that the stem
+                // stays vertically under its source. filling arbitrary gaps to the left
+                // creates diagonal lines whose vertical segment crosses through the text
+                // of rows placed in intervening columns.
+                if column < self.state.stems.len() && self.state.stems[column].is_none() {
+                    self.state.stems[column] = Some(LogStem {
+                        source: LogCoordinates(column, row),
+                        target: edge.target.clone(),
+                        indirect,
+                        known_immutable: header.is_immutable,
+                    });
+                    continue 'edges;
                 }
 
                 self.state.stems.push(Some(LogStem {
                     source: LogCoordinates(column, row),
                     target: edge.target.clone(),
                     indirect,
-                    was_inserted: false,
                     known_immutable: header.is_immutable,
                 }));
             }
