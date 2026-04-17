@@ -98,6 +98,7 @@ pub struct QuerySession<'q, 'w: 'q> {
     >,
     #[allow(clippy::type_complexity)]
     is_immutable: Box<dyn Fn(&CommitId) -> Result<bool, RevsetEvaluationError> + 'q>,
+    hidden_forks: std::collections::HashMap<CommitId, Vec<String>>,
 }
 
 impl<'q, 'w> QuerySession<'q, 'w> {
@@ -105,6 +106,7 @@ impl<'q, 'w> QuerySession<'q, 'w> {
         ws: &'q WorkspaceSession<'w>,
         revset: &'q dyn Revset,
         state: QueryState,
+        hidden_forks: std::collections::HashMap<CommitId, Vec<String>>,
     ) -> QuerySession<'q, 'w> {
         let as_id: for<'a> fn(&'a CommitId) -> &'a CommitId = commit_id_identity;
         let iter = TopoGroupedGraphIterator::new(revset.iter_graph(), as_id)
@@ -119,6 +121,7 @@ impl<'q, 'w> QuerySession<'q, 'w> {
             iter,
             state,
             is_immutable,
+            hidden_forks,
         }
     }
 
@@ -244,11 +247,18 @@ impl<'q, 'w> QuerySession<'q, 'w> {
                 }));
             }
 
+            let hidden_forks = self
+                .hidden_forks
+                .get(&commit_id)
+                .cloned()
+                .unwrap_or_default();
+
             rows.push(LogRow {
                 revision: header,
                 location: LogCoordinates(column, row),
                 padding,
                 lines,
+                hidden_forks,
             });
             row += 1;
 
@@ -297,7 +307,8 @@ impl<'q, 'w> QuerySession<'q, 'w> {
 pub fn query_log(ws: &WorkspaceSession, revset_str: &str, max_results: usize) -> Result<LogPage> {
     let state = QueryState::new(max_results);
     let revset = ws.evaluate_revset_str(revset_str)?;
-    let mut session = QuerySession::new(ws, &*revset, state);
+    let hidden_forks = ws.compute_hidden_forks(revset_str)?;
+    let mut session = QuerySession::new(ws, &*revset, state, hidden_forks);
     session.get_page()
 }
 

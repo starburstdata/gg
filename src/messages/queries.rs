@@ -94,6 +94,8 @@ pub struct LogRow {
     pub location: LogCoordinates,
     pub padding: usize,
     pub lines: Vec<LogLine>,
+    /// Names of bookmarks outside the log revset whose nearest visible ancestor is this commit.
+    pub hidden_forks: Vec<String>,
 }
 
 /// A paginated slice of the log graph.

@@ -50,6 +50,60 @@ async fn log_subset() -> Result<()> {
 }
 
 #[tokio::test]
+async fn log_hidden_forks() -> Result<()> {
+    let repo = mkrepo();
+
+    let mut session = WorkerSession::default();
+    let ws = session.load_workspace(repo.path()).await?;
+
+    let page = queries::query_log(&ws, "::@", 100)?;
+
+    let by_short_cid: std::collections::HashMap<String, &Vec<String>> = page
+        .rows
+        .iter()
+        .map(|r| (r.revision.id.commit.hex.clone(), &r.hidden_forks))
+        .collect();
+
+    // pull-request is on yupnommu, not in ::@; nearest visible ancestor is ywknyuol
+    let ywknyuol_forks = by_short_cid
+        .get("f86298e8166104062708cde7c1cf697022b4cf8b")
+        .expect("ywknyuol commit (immutable_bookmark/f86298e8) in log");
+    assert!(
+        ywknyuol_forks.iter().any(|s| s == "pull-request"),
+        "expected pull-request to fork from ywknyuol, got {ywknyuol_forks:?}"
+    );
+
+    // conflicted-merge is on pkullrwy, not in ::@; nearest visible ancestor is nxxylmpu
+    let nxxylmpu_forks = by_short_cid
+        .get("fa32b17fcc7f44f176539feec6c13af413924329")
+        .expect("nxxylmpu commit (fa32b17f) in log");
+    assert!(
+        nxxylmpu_forks.iter().any(|s| s == "conflicted-merge"),
+        "expected conflicted-merge to fork from nxxylmpu, got {nxxylmpu_forks:?}"
+    );
+
+    // remote-branch@origin is on xoooutru, not in ::@; nearest visible ancestor is tqnnuvwv
+    let tqnnuvwv_forks = by_short_cid
+        .get("983d594962e861aa155c8cee9e49122978cec40f")
+        .expect("tqnnuvwv commit (old@origin/983d5949) in log");
+    assert!(
+        tqnnuvwv_forks.iter().any(|s| s == "remote-branch@origin"),
+        "expected remote-branch@origin to fork from tqnnuvwv, got {tqnnuvwv_forks:?}"
+    );
+
+    // commits with no hidden bookmarks forking through them should be empty
+    let wnpusytq_forks = by_short_cid
+        .get("025843422c8f5374a4160fe79195b92d6ec3c6ee")
+        .expect("wnpusytq commit (main/02584342) in log");
+    assert!(
+        wnpusytq_forks.is_empty(),
+        "expected main_bookmark row to have no hidden forks, got {wnpusytq_forks:?}"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn log_mutable() -> Result<()> {
     let repo = mkrepo();
 

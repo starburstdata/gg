@@ -527,7 +527,8 @@ async fn handle_query(
         }
     };
 
-    let mut query = queries::QuerySession::new(ws, &*revset, query_state);
+    let hidden_forks = ws.compute_hidden_forks(revset_str).unwrap_or_default();
+    let mut query = queries::QuerySession::new(ws, &*revset, query_state, hidden_forks);
     let page = query.get_page();
     tx.send(page)?;
 

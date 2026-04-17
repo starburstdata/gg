@@ -394,6 +394,66 @@ impl WorkspaceSession<'_> {
         self.evaluate_revset_expr(self.operation.repo.as_ref(), expr)
     }
 
+    /// For each bookmark whose target commit is outside `log_revset_str`, find the
+    /// nearest visible ancestor(s) in that revset and attribute the bookmark's display
+    /// name to them. Callers can render an indicator on those commits to hint that
+    /// hidden branches fork there.
+    pub(crate) fn compute_hidden_forks(
+        &self,
+        log_revset_str: &str,
+    ) -> Result<HashMap<CommitId, Vec<String>>> {
+        let log_expr = parse_revset(&self.parse_context(), log_revset_str)?;
+        let repo = self.operation.repo.as_ref();
+        let log_revset = self.evaluate_revset_expr(repo, log_expr.clone())?;
+        let log_contains = log_revset.containing_fn();
+
+        let mut fork_map: HashMap<CommitId, Vec<String>> = HashMap::new();
+        for (commit_id, refs) in self.ref_index().iter() {
+            if log_contains(commit_id)? {
+                continue;
+            }
+            let labels: Vec<String> = refs
+                .iter()
+                .filter_map(|r| match r {
+                    messages::StoreRef::LocalBookmark { bookmark_name, .. } => {
+                        Some(bookmark_name.clone())
+                    }
+                    messages::StoreRef::RemoteBookmark {
+                        bookmark_name,
+                        remote_name,
+                        is_synced,
+                        is_tracked,
+                        ..
+                    } if !is_synced || !is_tracked => {
+                        Some(format!("{bookmark_name}@{remote_name}"))
+                    }
+                    _ => None,
+                })
+                .collect();
+            if labels.is_empty() {
+                continue;
+            }
+            let bookmark_expr = RevsetExpression::commit(commit_id.clone());
+            let fork_expr = log_expr.intersection(&bookmark_expr.ancestors()).heads();
+            let fork_revset = self.evaluate_revset_expr(repo, fork_expr)?;
+            for fork_id in fork_revset.iter() {
+                let fork_id = fork_id.map_err(|e| anyhow!(e))?;
+                let entry = fork_map.entry(fork_id).or_default();
+                for label in &labels {
+                    if !entry.contains(label) {
+                        entry.push(label.clone());
+                    }
+                }
+            }
+        }
+
+        for labels in fork_map.values_mut() {
+            labels.sort();
+        }
+
+        Ok(fork_map)
+    }
+
     pub(crate) fn evaluate_immutable(&self) -> Result<Box<dyn Revset + '_>> {
         let mut diagnostics = RevsetDiagnostics::new(); // XXX pass this down, then include it in the Result
         let expr =
@@ -1376,6 +1436,10 @@ impl RefIndex {
         } else {
             &[]
         }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&CommitId, &[messages::StoreRef])> {
+        self.index.iter().map(|(k, v)| (k, v.as_slice()))
     }
 }
 
