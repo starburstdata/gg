@@ -412,6 +412,7 @@
                 {#if row}
                     <RevisionObject
                         header={row.revision}
+                        hiddenForks={row.hidden_forks}
                         selected={isInSelectedRange(row, $revisionSelectEvent)}
                         onClick={handleClick}
                         onShiftClick={handleShiftClick} />

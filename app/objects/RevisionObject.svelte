@@ -2,6 +2,8 @@
     import type { RevHeader } from "../messages/RevHeader";
     import type { Operand } from "../messages/Operand";
     import { ignoreToggled, currentTarget, revisionSelectEvent } from "../stores.js";
+    import Chip from "../controls/Chip.svelte";
+    import Icon from "../controls/Icon.svelte";
     import IdSpan from "../controls/IdSpan.svelte";
     import BookmarkObject from "./BookmarkObject.svelte";
     import Object from "./Object.svelte";
@@ -15,6 +17,7 @@
     export let child: RevHeader | null = null;
     export let selected: boolean; // same as the imported event, but parent may want to force a value
     export let noBookmarks: boolean = false;
+    export let hiddenForks: string[] = [];
     export let onClick: ((header: RevHeader) => void) | undefined = undefined;
     export let onShiftClick: ((header: RevHeader) => void) | undefined = undefined;
 
@@ -104,6 +107,14 @@
                 <span class="email"><AuthorSpan author={header.author} /></span>
 
                 <span class="refs">
+                    {#each hiddenForks as label}
+                        <div>
+                            <Chip context={false} target={false} immobile tip={`${label} forks here but is outside the current revset`}>
+                                <Icon name="git-branch" state="change" />
+                                <span>{label}</span>
+                            </Chip>
+                        </div>
+                    {/each}
                     {#each header.refs as ref}
                         {#if ref.type != "Tag"}
                             {#if ref.type == "LocalBookmark" || !ref.is_synced || !ref.is_tracked}
