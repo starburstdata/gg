@@ -136,11 +136,9 @@ impl<'q, 'w> QuerySession<'q, 'w> {
             // find an existing stem targeting the current node
             let mut column = self.state.stems.len();
             let mut stem_known_immutable = false;
-            let mut padding = 0; // used to offset the commit summary past some edges
 
             if let Some(slot) = self.find_stem_for_commit(&commit_id) {
                 column = slot;
-                padding = self.state.stems.len() - column - 1;
             }
 
             // terminate any existing stem, removing it from the end or leaving a gap
@@ -168,7 +166,6 @@ impl<'q, 'w> QuerySession<'q, 'w> {
                 for (slot, stem) in self.state.stems.iter().enumerate() {
                     if stem.is_none() {
                         column = slot;
-                        padding = self.state.stems.len() - slot - 1;
                         break;
                     }
                 }
@@ -195,6 +192,11 @@ impl<'q, 'w> QuerySession<'q, 'w> {
             self.state
                 .stems
                 .truncate(self.state.stems.len() - empty_stems);
+
+            // compute padding from the post-truncate stems so rows with a just-terminated
+            // right-edge stem align with their successors instead of being pushed 18px
+            // further right.
+            let padding = self.state.stems.len().saturating_sub(column + 1);
 
             // merge edges into existing stems or add new ones to the right
             let mut next_missing: Option<CommitId> = None;
