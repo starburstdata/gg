@@ -191,6 +191,10 @@ impl<'q, 'w> QuerySession<'q, 'w> {
 
             // merge edges into existing stems or add new ones to the right
             let mut next_missing: Option<CommitId> = None;
+            // tracks an existing-stem match for a single-parent commit, so we can
+            // rescue the stem leftward after processing edges (sapling-style).
+            let mut single_parent_match: Option<(usize, usize)> = None;
+
             'edges: for edge in commit_edges.iter() {
                 if edge.edge_type == GraphEdgeType::Missing {
                     if edge.target == root_id {
@@ -206,11 +210,15 @@ impl<'q, 'w> QuerySession<'q, 'w> {
                     if let Some(stem) = stem
                         && stem.target == edge.target
                     {
+                        let line_idx = lines.len();
                         lines.push(LogLine::ToIntersection {
                             indirect,
                             source: LogCoordinates(column, row),
                             target: LogCoordinates(slot, row + 1),
                         });
+                        if commit_edges.len() == 1 {
+                            single_parent_match = Some((slot, line_idx));
+                        }
                         continue 'edges;
                     }
                 }
@@ -235,6 +243,31 @@ impl<'q, 'w> QuerySession<'q, 'w> {
                     indirect,
                     known_immutable: header.is_immutable,
                 }));
+            }
+
+            // column rescue (sapling-style): if this is a single-parent commit whose
+            // parent stem lives to the right, pull the stem left into the commit's
+            // column. cascading rescues across a linear branch compact the layout,
+            // so e.g. a stem created at col 3 gradually moves to col 1 as its linear
+            // descendants are processed, rather than jumping at the final termination.
+            if let Some((parent_col, line_idx)) = single_parent_match
+                && parent_col > column
+            {
+                let mut stem = self.state.stems[parent_col]
+                    .take()
+                    .expect("matched stem must exist");
+                // replace the ToIntersection (which would land in what is now an
+                // empty column) with a FromNode ending at the commit's column
+                lines[line_idx] = LogLine::FromNode {
+                    indirect: stem.indirect,
+                    source: stem.source,
+                    target: LogCoordinates(column, row),
+                };
+                // move the stem. update its source so a later rescue or termination
+                // draws from the commit's column onward rather than from the original
+                // source (which is already covered by the line we just emitted).
+                stem.source = LogCoordinates(column, row);
+                self.state.stems[column] = Some(stem);
             }
 
             rows.push(LogRow {
