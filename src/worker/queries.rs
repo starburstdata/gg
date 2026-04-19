@@ -75,6 +75,10 @@ pub struct QueryState {
     next_row: usize,
     /// ongoing vertical stems keyed by column; None indicates an empty slot
     stems: Vec<Option<Stem>>,
+    /// graph width (in columns) of the last emitted row, carried across
+    /// pages so the first row of the next page can still widen its padding
+    /// to match the previous page's final row.
+    last_own_width: usize,
 }
 
 impl QueryState {
@@ -83,6 +87,7 @@ impl QueryState {
             page_size,
             next_row: 0,
             stems: Vec::new(),
+            last_own_width: 0,
         }
     }
 }
@@ -140,6 +145,11 @@ impl<'q, 'w> QuerySession<'q, 'w> {
 
     pub fn get_page(&mut self) -> Result<LogPage> {
         let mut rows: Vec<LogRow> = Vec::with_capacity(self.state.page_size);
+        // parallel to `rows`: graph width at each row's widest point during
+        // processing. Used in a post-loop pass to propagate padding along
+        // graph-connected rows so a node's text aligns with its graph
+        // neighbours instead of snapping to its own narrow column count.
+        let mut own_widths: Vec<usize> = Vec::with_capacity(self.state.page_size);
         let mut row = self.state.next_row;
         let max = row + self.state.page_size;
 
@@ -302,6 +312,11 @@ impl<'q, 'w> QuerySession<'q, 'w> {
                 // would run them across the rescuing commit's own circle.
             }
 
+            // capture the graph's widest extent at this row (after parent
+            // allocation and rescue, before trimming) so the post-loop
+            // padding pass can reach past every column this row touches.
+            let own_width = self.state.stems.len();
+
             // 5. trim trailing empty stems and handle any "missing" edges that
             //    need a terminator in the next row (Sapling marks these with ~).
             while matches!(self.state.stems.last(), Some(None)) {
@@ -309,7 +324,6 @@ impl<'q, 'w> QuerySession<'q, 'w> {
             }
 
             let location = LogCoordinates(node_col, row);
-            let padding = self.state.stems.len().saturating_sub(node_col + 1);
 
             let hidden_forks = self
                 .hidden_forks
@@ -320,10 +334,11 @@ impl<'q, 'w> QuerySession<'q, 'w> {
             rows.push(LogRow {
                 revision: header,
                 location,
-                padding,
+                padding: 0, // filled in below by the neighbour-aware pass
                 lines,
                 hidden_forks,
             });
+            own_widths.push(own_width);
             row += 1;
 
             // missing-parent terminators: any new stem targeting a commit that
@@ -357,6 +372,61 @@ impl<'q, 'w> QuerySession<'q, 'w> {
             if row == max {
                 break;
             }
+        }
+
+        // Neighbour-aware padding: each line (ToNode/FromNode/ToIntersection/
+        // ToMissing) visually spans a range of rows. Extend each spanned row's
+        // effective width to the line's rightmost column so text aligns with
+        // its graph-connected neighbours without being pulled wider by
+        // unrelated rows. Starts from own_width, which already covers the
+        // row's own stems including any passing through vertically.
+        let mut row_index_by_number = std::collections::HashMap::new();
+        for (i, r) in rows.iter().enumerate() {
+            row_index_by_number.insert(r.location.1, i);
+        }
+        let mut effective = own_widths.clone();
+        for row in &rows {
+            for line in &row.lines {
+                let (source, target, via) = match line {
+                    LogLine::FromNode {
+                        source,
+                        target,
+                        via,
+                        ..
+                    } => (source, target, *via),
+                    LogLine::ToNode { source, target, .. }
+                    | LogLine::ToIntersection { source, target, .. }
+                    | LogLine::ToMissing { source, target, .. } => (source, target, None),
+                };
+                // rescue FromNodes hop through `via` so the vertical at
+                // that column is visible at every row the line covers;
+                // its width contributes to alignment even though `via`
+                // isn't one of the endpoints.
+                let width = source.0.max(target.0).max(via.unwrap_or(0)) + 1;
+                let (lo, hi) = if source.1 <= target.1 {
+                    (source.1, target.1)
+                } else {
+                    (target.1, source.1)
+                };
+                for rn in lo..=hi {
+                    if let Some(&idx) = row_index_by_number.get(&rn)
+                        && effective[idx] < width
+                    {
+                        effective[idx] = width;
+                    }
+                }
+            }
+        }
+        // carry the previous page's last width into this page's first row so
+        // graph-connected rows across the page boundary stay aligned.
+        if !effective.is_empty() && effective[0] < self.state.last_own_width {
+            effective[0] = self.state.last_own_width;
+        }
+        for i in 0..rows.len() {
+            rows[i].padding = effective[i].saturating_sub(rows[i].location.0 + 1);
+        }
+        if let Some(&last) = effective.last() {
+            self.state.last_own_width = last;
         }
 
         self.state.next_row = row;
