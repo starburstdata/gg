@@ -738,6 +738,10 @@ impl WorkspaceSession<'_> {
                 "@ | ancestors(bookmarks(), 5)".to_string(),
             );
             query_choices.insert(
+                "local-bookmarks".to_string(),
+                "@ | ancestors(bookmarks())".to_string(),
+            );
+            query_choices.insert(
                 "remote-bookmarks".to_string(),
                 "@ | ancestors(remote_bookmarks(), 5)".to_string(),
             );
