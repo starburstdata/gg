@@ -361,11 +361,13 @@
                     passNextRow.push(enhancedLine);
                 } else {
                     // other lines end at their owning row, so we need to add them to all previous rows and then this one.
-                    // a rescue FromNode targets one row past its owner so the curve ends below the rescuing commit's
-                    // circle; cap the loop at already-built rows so we don't dereference the in-progress one.
+                    // line.source[1] / line.target[1] are row numbers from the backend's coordinate
+                    // system, which skip rows for missing-parent terminators — so they don't map 1:1
+                    // to graph indices. find the source row and walk indices between source and target.
                     enhancedLine.parent = row.revision;
-                    enhancedLine.child = graph[line.source[1]].revision;
-                    for (let i = line.source[1]; i < line.target[1] && i < graph.length; i++) {
+                    let sourceIdx = graph.findIndex((r) => r.location[1] == line.source[1]);
+                    enhancedLine.child = graph[sourceIdx].revision;
+                    for (let i = sourceIdx; i < graph.length && graph[i].location[1] < line.target[1]; i++) {
                         graph[i].passingLines.push(enhancedLine);
                     }
                     enhancedRow.passingLines.push(enhancedLine);
