@@ -11,6 +11,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "22": "^0.0.0",
     "@catppuccin/palette": "^1.0.3",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-shell": "^2.3.5",

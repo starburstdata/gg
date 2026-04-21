@@ -239,7 +239,9 @@ async fn serve_index(State(state): State<AppState>) -> Result<impl IntoResponse,
 
     // used to track open tabs; done here so that it works for both vite and static assets
     let client_id = uuid::Uuid::new_v4().to_string();
-    let injected_script = format!(r#"<script>window.__GG_CLIENT_ID__="{client_id}";</script>"#);
+    let injected_script = format!(
+        r#"<script>window.__GG_CLIENT_ID__="{client_id}";window.__gg_setColorScheme=function(s){{if(s)document.documentElement.setAttribute("data-gg-scheme",s);else document.documentElement.removeAttribute("data-gg-scheme");}};</script>"#
+    );
     let asset_html = String::from_utf8_lossy(asset.data());
     let modified_html = asset_html.replace("</head>", &format!("{injected_script}</head>"));
 
