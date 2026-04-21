@@ -14,7 +14,7 @@
 </script>
 
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, afterUpdate } from "svelte";
 
     import type { Operand } from "../messages/Operand";
 
@@ -31,27 +31,40 @@
 
     let activedescendant = `${type}-${descendant}`;
     let box: HTMLElement;
-    let pollFrame: number;
+    let observed: Element | null = null;
+    let resizeObserver: ResizeObserver;
 
+    // a scrollbar appearing/disappearing shrinks box.clientWidth without
+    // changing box's border-box, so ResizeObserver on box alone misses it.
+    // observe the slot content too, and re-observe when it's replaced
+    // (e.g. "Loading changes..." → the actual graph svg).
     onMount(() => {
-        pollFrame = requestAnimationFrame(pollScroll);
-        return () => {
-            if (pollFrame) cancelAnimationFrame(pollFrame);
-        };
+        // seed size synchronously — ResizeObserver fires its first callback in a
+        // later microtask, which would leave consumers (e.g. the graph pane's
+        // visibleRows calc) with 0 during the initial render.
+        clientWidth = box.clientWidth;
+        clientHeight = box.clientHeight;
+
+        resizeObserver = new ResizeObserver(() => {
+            if (box.clientWidth !== clientWidth) clientWidth = box.clientWidth;
+            if (box.clientHeight !== clientHeight) clientHeight = box.clientHeight;
+        });
+        resizeObserver.observe(box);
+
+        return () => resizeObserver.disconnect();
     });
 
-    function pollScroll() {
-        if (box) {
-            if (box.scrollTop !== scrollTop) {
-                scrollTop = box.scrollTop;
-            }
-            // ResizeObserver doesn't fire when a scrollbar appears/disappears
-            if (box.clientWidth !== clientWidth) {
-                clientWidth = box.clientWidth;
-            }
+    afterUpdate(() => {
+        let child = box?.firstElementChild;
+        if (child !== observed) {
+            if (observed) resizeObserver?.unobserve(observed);
+            observed = child;
+            if (child) resizeObserver?.observe(child);
         }
+    });
 
-        pollFrame = requestAnimationFrame(pollScroll);
+    function onScroll() {
+        if (box.scrollTop !== scrollTop) scrollTop = box.scrollTop;
     }
 
     function onKeyDown(event: KeyboardEvent) {
@@ -168,8 +181,7 @@
     aria-activedescendant={activedescendant}
     tabindex="0"
     bind:this={box}
-    bind:clientHeight
-    bind:clientWidth
+    on:scroll={onScroll}
     on:keydown={onKeyDown}>
     <slot />
 </ol>
