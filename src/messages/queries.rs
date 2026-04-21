@@ -110,3 +110,13 @@ pub struct LogPage {
     pub rows: Vec<LogRow>,
     pub has_more: bool,
 }
+
+/// Before/after file content for a changed file at a specific revision.
+#[derive(Serialize, Debug)]
+#[cfg_attr(feature = "ts-rs", derive(TS), ts(export, export_to = "app/messages/"))]
+pub struct FileContentResult {
+    /// Content before the change (None if the file was added).
+    pub before: Option<String>,
+    /// Content after the change (None if the file was deleted).
+    pub after: Option<String>,
+}

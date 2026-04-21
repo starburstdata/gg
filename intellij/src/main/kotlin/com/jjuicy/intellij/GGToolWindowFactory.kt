@@ -32,7 +32,7 @@ class GGToolWindowFactory : ToolWindowFactory, DumbAware {
         val panelDisposable = Disposer.newDisposable("jjuicy-browser-panel")
         Disposer.register(toolWindow.disposable, panelDisposable)
 
-        val panel = GGBrowserPanel(processManager, panelDisposable)
+        val panel = GGBrowserPanel(project, processManager, panelDisposable)
 
         val content = ContentFactory.getInstance()
             .createContent(panel, null, false)

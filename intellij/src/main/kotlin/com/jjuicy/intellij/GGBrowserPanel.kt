@@ -1,17 +1,27 @@
 package com.jjuicy.intellij
 
+import com.google.gson.JsonParser
+import com.intellij.diff.DiffContentFactory
+import com.intellij.diff.DiffManager
+import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.ide.ui.LafManagerListener
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettingsListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.JBColor
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
+import com.intellij.ui.jcef.JBCefBrowserBase
+import com.intellij.ui.jcef.JBCefJSQuery
 import java.awt.BorderLayout
 import java.awt.Font
+import java.net.HttpURLConnection
+import java.net.URI
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.SwingConstants
@@ -27,11 +37,13 @@ private val LOG = logger<GGBrowserPanel>()
  * panel if JCEF is not supported.
  */
 class GGBrowserPanel(
+    private val project: Project,
     private val processManager: GGProcessManager,
     private val parentDisposable: Disposable,
 ) : JPanel(BorderLayout()), GGProcessManager.ProcessListener {
 
     private var browser: JBCefBrowser? = null
+    private var jsQueryBridge: JBCefJSQuery? = null
 
     init {
         if (!JBCefApp.isSupported()) {
@@ -103,10 +115,93 @@ class GGBrowserPanel(
         )
     }
 
+    // wire window.__gg_openDiff so the frontend can request IntelliJ's native diff view
+    private fun applyDiffBridge(jbBrowser: JBCefBrowser) {
+        val query = jsQueryBridge ?: return
+        val injection = query.inject("json")
+        jbBrowser.cefBrowser.executeJavaScript(
+            "window.__gg_openDiff = function(json) { $injection };",
+            jbBrowser.cefBrowser.url,
+            0
+        )
+    }
+
+    // fetch before/after content from backend and open IntelliJ's diff viewer
+    private fun openDiff(serverUrl: String, requestJson: String) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val url = URI.create("$serverUrl/api/query/query_file_content").toURL()
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.doOutput = true
+                conn.outputStream.use { it.write(requestJson.toByteArray(Charsets.UTF_8)) }
+
+                if (conn.responseCode != 200) {
+                    LOG.warn("query_file_content returned ${conn.responseCode}")
+                    return@executeOnPooledThread
+                }
+
+                val responseBody = conn.inputStream.bufferedReader(Charsets.UTF_8).readText()
+                val responseObj = JsonParser.parseString(responseBody).asJsonObject
+                val before = if (responseObj.get("before")?.isJsonNull == false)
+                    responseObj.get("before")?.asString else null
+                val after = if (responseObj.get("after")?.isJsonNull == false)
+                    responseObj.get("after")?.asString else null
+
+                // extract filename for display and file-type detection
+                val fileName = try {
+                    val reqObj = JsonParser.parseString(requestJson).asJsonObject
+                    reqObj.getAsJsonObject("path")?.get("relative_path")?.asString
+                } catch (_: Exception) { null }
+
+                ApplicationManager.getApplication().invokeLater {
+                    val factory = DiffContentFactory.getInstance()
+                    val fileType = fileName?.let {
+                        FileTypeManager.getInstance().getFileTypeByFileName(it)
+                    }
+
+                    val beforeContent = if (fileType != null)
+                        factory.create(project, before ?: "", fileType)
+                    else
+                        factory.create(project, before ?: "")
+
+                    val afterContent = if (fileType != null)
+                        factory.create(project, after ?: "", fileType)
+                    else
+                        factory.create(project, after ?: "")
+
+                    val request = SimpleDiffRequest(
+                        fileName ?: "Diff",
+                        beforeContent,
+                        afterContent,
+                        "Before",
+                        "After",
+                    )
+                    DiffManager.getInstance().showDiff(project, request)
+                }
+            } catch (e: Exception) {
+                LOG.warn("Failed to open IntelliJ diff view", e)
+            }
+        }
+    }
+
     private fun showBrowser(url: String) {
         val jbBrowser = JBCefBrowser.createBuilder()
             .setUrl("$url?embedded")
             .build()
+
+        // create the JS-to-Kotlin bridge for opening diffs in the native viewer
+        val jsQuery = JBCefJSQuery.create(jbBrowser as JBCefBrowserBase)
+        jsQuery.addHandler { json ->
+            val serverUrl = processManager.serverUrl
+            if (serverUrl != null) {
+                openDiff(serverUrl, json)
+            }
+            JBCefJSQuery.Response(null)
+        }
+        jsQueryBridge = jsQuery
+        Disposer.register(parentDisposable, jsQuery)
 
         // prevent JCEF from opening target=_blank links inside the panel
         jbBrowser.jbCefClient.addLifeSpanHandler(
@@ -144,6 +239,7 @@ class GGBrowserPanel(
                         applyScheme(jbBrowser)
                         applyEmbeddedMode(jbBrowser)
                         applyFontSize(jbBrowser)
+                        applyDiffBridge(jbBrowser)
                     }
                 }
             },
@@ -171,6 +267,7 @@ class GGBrowserPanel(
 
     fun dispose() {
         processManager.removeListener(this)
+        jsQueryBridge = null
         browser?.let { Disposer.dispose(it) }
         browser = null
     }
