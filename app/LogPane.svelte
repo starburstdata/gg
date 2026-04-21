@@ -58,6 +58,11 @@
     let logWidth = 0;
     let logScrollTop = 0;
 
+    // paging state for on-demand loading; keeps launch fast on large repos
+    let hasMorePages = false;
+    let fetchingNextPage = false;
+    const rowHeight = 30;
+
     /**
      * Helper to set selection with proper topological ordering.
      * In the graph, higher indices are older (ancestors), so from should have the higher index.
@@ -279,6 +284,9 @@
     }
 
     async function loadLog(selectFirst: boolean) {
+        fetchingNextPage = false;
+        hasMorePages = false;
+
         let page = await query<LogPage>(
             "query_log",
             {
@@ -290,26 +298,57 @@
         if (page.type == "data") {
             graphRows = [];
             graphRows = addPageToGraph(graphRows, page.value.rows);
+            hasMorePages = page.value.has_more;
 
-            if (selectFirst && page.value.rows.length > 0) {
-                setSelection(0, 0);
+            if (selectFirst) {
+                // on initial load, keep the backend responsive by fetching more pages only as the user scrolls
+                if (page.value.rows.length > 0) {
+                    setSelection(0, 0);
+                }
+                return;
             }
 
-            while (page.value.has_more) {
+            // on reload we need the full log to relocate the previous selection
+            while (hasMorePages) {
                 let next_page = await query<LogPage>("query_log_next_page", null);
                 if (next_page.type == "data") {
                     graphRows = addPageToGraph(graphRows, next_page.value.rows);
-                    page = next_page;
+                    hasMorePages = next_page.value.has_more;
                 } else {
+                    hasMorePages = false;
                     break;
                 }
             }
 
-            // XXX perhaps we should retry this after each page
-            if (!selectFirst) {
-                syncSelectionWithGraph();
-            }
+            syncSelectionWithGraph();
         }
+    }
+
+    async function loadNextPage() {
+        if (fetchingNextPage || !hasMorePages || !graphRows) return;
+        fetchingNextPage = true;
+        try {
+            let next_page = await query<LogPage>("query_log_next_page", null);
+            if (next_page.type == "data" && graphRows) {
+                graphRows = addPageToGraph(graphRows, next_page.value.rows);
+                hasMorePages = next_page.value.has_more;
+            } else if (next_page.type != "data") {
+                hasMorePages = false;
+            }
+        } finally {
+            fetchingNextPage = false;
+        }
+    }
+
+    // fetch the next page as the user scrolls within one viewport of the end
+    $: if (
+        graphRows &&
+        hasMorePages &&
+        !fetchingNextPage &&
+        logHeight > 0 &&
+        logScrollTop + logHeight * 2 >= graphRows.length * rowHeight
+    ) {
+        loadNextPage();
     }
 
     // policy: reselect by commit id if the original revisions are still around, update by change id if they aren't
