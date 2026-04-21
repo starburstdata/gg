@@ -3,4 +3,5 @@
 
 interface Window {
     __GG_CLIENT_ID__?: string;
+    __GG_EMBEDDED__?: boolean;
 }

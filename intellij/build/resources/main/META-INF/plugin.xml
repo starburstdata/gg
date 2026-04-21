@@ -1,0 +1,19 @@
+<idea-plugin>
+  <idea-version since-build="243" until-build="253.*" />
+  <version>0.1.0</version>
+  <id>com.jjuicy.intellij</id>
+  <name>jjuicy</name>
+  <vendor>jjuicy</vendor>
+  <description><![CDATA[Jujutsu VCS GUI embedded as a sidebar tool window.
+        Requires the <code>jjuicy</code> (or <code>gg</code>) binary to be available on PATH,
+        or configured in Settings → Tools → jjuicy.]]></description>
+  <depends>com.intellij.modules.platform</depends>
+  <extensions defaultExtensionNs="com.intellij">
+    <toolWindow id="jjuicy" anchor="right" secondary="false" factoryClass="com.jjuicy.intellij.GGToolWindowFactory" icon="/icons/gg-icon.svg" />
+    <projectService serviceImplementation="com.jjuicy.intellij.GGProcessManager" />
+    <applicationService serviceImplementation="com.jjuicy.intellij.GGSettings" />
+    <applicationConfigurable parentId="tools" instance="com.jjuicy.intellij.GGSettingsConfigurable" id="com.jjuicy.intellij.GGSettingsConfigurable" displayName="jjuicy" />
+    <notificationGroup id="jjuicy" displayType="BALLOON" />
+    <postStartupActivity implementation="com.jjuicy.intellij.GGStartupActivity" />
+  </extensions>
+</idea-plugin>

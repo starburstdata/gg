@@ -40,6 +40,11 @@ export function isTauri(): boolean {
     return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
+export function isEmbedded(): boolean {
+    return typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).has('embedded');
+}
+
 /**
  * multiplexes events into a svelte store; never actually unsubscribes because the store protocol isn't async.
  * gui mode: events are broadcast to and received from the backend via Tauri

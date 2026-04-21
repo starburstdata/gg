@@ -2,7 +2,7 @@ import type { MutationResult } from "./messages/MutationResult";
 import { currentInput, currentMutation, progressEvent, repoConfigEvent, repoStatusEvent, revisionSelectEvent } from "./stores";
 import { isTauri, type Query } from "./events";
 
-export { isTauri, onEvent, type Query, type Settable } from "./events";
+export { isTauri, isEmbedded, onEvent, type Query, type Settable } from "./events";
 
 /** 
  * structurally equivalent to InvokeArgs from @tauri-apps/api/core

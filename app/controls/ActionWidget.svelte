@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { dragOverWidget, hasModal } from "../stores";
+    import { dragOverWidget, mouseOverWidget, hasModal } from "../stores";
 
     export let tip: string = "";
     export let onClick: (event: MouseEvent) => void;
@@ -17,6 +17,7 @@
     on:click|stopPropagation={isDisabled ? undefined : onClick}
     on:dragenter={dragOverWidget}
     on:dragover={dragOverWidget}
+    on:mouseenter={mouseOverWidget}
     title={isDisabled ? "" : tip}>
     <slot />
 </button>

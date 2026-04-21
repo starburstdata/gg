@@ -82,9 +82,18 @@ class GGBrowserPanel(
         )
     }
 
+    // secondary signal for late-arriving code that checks window.__GG_EMBEDDED__
+    private fun applyEmbeddedMode(jbBrowser: JBCefBrowser) {
+        jbBrowser.cefBrowser.executeJavaScript(
+            "window.__GG_EMBEDDED__ = true;",
+            jbBrowser.cefBrowser.url,
+            0
+        )
+    }
+
     private fun showBrowser(url: String) {
         val jbBrowser = JBCefBrowser.createBuilder()
-            .setUrl(url)
+            .setUrl("$url?embedded")
             .build()
 
         // prevent JCEF from opening target=_blank links inside the panel
@@ -119,7 +128,10 @@ class GGBrowserPanel(
                     frame: org.cef.browser.CefFrame?,
                     httpStatusCode: Int,
                 ) {
-                    if (frame?.isMain == true) applyScheme(jbBrowser)
+                    if (frame?.isMain == true) {
+                        applyScheme(jbBrowser)
+                        applyEmbeddedMode(jbBrowser)
+                    }
                 }
             },
             jbBrowser.cefBrowser

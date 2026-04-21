@@ -5,7 +5,7 @@ Core component for direct-manipulation objects. A drag&drop source.
 
 <script lang="ts">
     import type { Operand } from "../messages/Operand";
-    import { trigger, isTauri } from "../ipc";
+    import { trigger, isTauri, isEmbedded } from "../ipc";
     import { currentContext, currentSource, selectionHeaders, hasMenu, ignoreToggled } from "../stores";
     import { createEventDispatcher } from "svelte";
     import { get } from "svelte/store";
@@ -31,6 +31,7 @@ Core component for direct-manipulation objects. A drag&drop source.
     let id = suffix == null ? null : operand == null ? null : `${operand.type}-${suffix}`;
     let dragging: boolean;
     let dragHint: string | null = null;
+    let embedded = isEmbedded();
 
     function onClick(event: MouseEvent) {
         dispatch("click", event);
@@ -103,6 +104,56 @@ Core component for direct-manipulation objects. A drag&drop source.
         dragHint = null;
     }
 
+    // mouse-based drag for embedded JCEF contexts where HTML5 DnD doesn't work
+    function onMouseDown(event: MouseEvent) {
+        if (event.button !== 0 || operand == null) return;
+
+        let effectiveOperand = getEffectiveOperand();
+        let canDrag =
+            effectiveOperand == null
+                ? { type: "no", hint: "" }
+                : new BinaryMutator(effectiveOperand, null, $ignoreToggled).canDrag();
+
+        if (canDrag.type == "no") return;
+
+        event.stopPropagation();
+        let startX = event.clientX;
+        let startY = event.clientY;
+
+        function activate() {
+            window.removeEventListener("mousemove", onMove);
+            currentContext.set(null);
+            $currentSource = effectiveOperand;
+            dragging = true;
+            if (canDrag.type == "maybe") {
+                dragHint = canDrag.hint;
+            }
+        }
+
+        function onMove(e: MouseEvent) {
+            let dx = e.clientX - startX;
+            let dy = e.clientY - startY;
+            if (dx * dx + dy * dy >= 25) activate(); // 5px threshold
+        }
+
+        function onUp() {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            window.removeEventListener("keydown", onKey);
+            $currentSource = null;
+            dragging = false;
+            dragHint = null;
+        }
+
+        function onKey(e: KeyboardEvent) {
+            if (e.key === "Escape") onUp();
+        }
+
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+        window.addEventListener("keydown", onKey);
+    }
+
     // check if this operand is part of the current context
     function isInContext(ctx: Operand | null, op: Operand | null): boolean {
         if (!ctx || !op) return false;
@@ -134,7 +185,8 @@ Core component for direct-manipulation objects. A drag&drop source.
     class:context={dragging || inContext || inSource}
     class:hint={dragHint}
     tabindex="-1"
-    draggable={operand != null}
+    draggable={!embedded && operand != null}
+    class:draggable={embedded && operand != null}
     role="option"
     aria-label={label}
     aria-selected={selected}
@@ -142,7 +194,8 @@ Core component for direct-manipulation objects. A drag&drop source.
     on:dblclick={onDoubleClick}
     on:contextmenu={onMenu}
     on:dragstart={onDragStart}
-    on:dragend={onDragEnd}>
+    on:dragend={onDragEnd}
+    on:mousedown={embedded ? onMouseDown : undefined}>
     <slot context={dragging || inContext || inSource} hint={dragHint} />
 </button>
 
@@ -161,7 +214,8 @@ Core component for direct-manipulation objects. A drag&drop source.
         align-items: center;
     }
 
-    button[draggable="true"] {
+    button[draggable="true"],
+    button.draggable {
         cursor: grab;
     }
 

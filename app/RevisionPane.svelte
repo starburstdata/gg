@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { RevsResult } from "./messages/RevsResult";
-    import { ignoreToggled, changeSelectEvent, dragOverWidget } from "./stores";
+    import { ignoreToggled, changeSelectEvent, dragOverWidget, mouseOverWidget } from "./stores";
     import ChangeObject from "./objects/ChangeObject.svelte";
     import HunkObject from "./objects/HunkObject.svelte";
     import RevisionObject from "./objects/RevisionObject.svelte";
@@ -199,6 +199,7 @@
                 bind:value={editableDescription}
                 on:dragenter={dragOverWidget}
                 on:dragover={dragOverWidget}
+                on:mouseenter={mouseOverWidget}
                 on:keydown={(ev) => {
                     if (descriptionChanged && ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {
                         updateDescription();
