@@ -276,6 +276,14 @@ pub fn build_context(
                 true,
                 None::<&str>,
             )?,
+            &PredefinedMenuItem::separator(app_handle)?,
+            &MenuItem::with_id(
+                app_handle,
+                "revision_copy_change_id",
+                "Copy change ID",
+                true,
+                None::<&str>,
+            )?,
         ],
     )?;
 
@@ -632,6 +640,7 @@ pub fn handle_event(window: &Window, event: MenuEvent) -> Result<()> {
         "revision_squash" => window.emit_to(target, "gg://context/revision", "squash")?,
         "revision_restore" => window.emit_to(target, "gg://context/revision", "restore")?,
         "revision_bookmark" => window.emit_to(target, "gg://context/revision", "bookmark")?,
+        "revision_copy_change_id" => window.emit_to(target, "gg://context/revision", "copy_change_id")?,
         "tree_squash" => window.emit_to(target, "gg://context/tree", "squash")?,
         "tree_restore" => window.emit_to(target, "gg://context/tree", "restore")?,
         "bookmark_track" => window.emit_to(target, "gg://context/bookmark", "track")?,
