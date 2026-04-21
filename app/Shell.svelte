@@ -260,7 +260,16 @@
     }
 
     function mutateRef(event: string) {
-        if ($currentContext?.type == "Ref") {
+        if (event === "copy_name" && $currentContext?.type == "Ref") {
+            let ref = $currentContext.ref;
+            let name =
+                ref.type === "Tag"
+                    ? ref.tag_name
+                    : ref.type === "LocalBookmark"
+                      ? ref.bookmark_name
+                      : `${ref.bookmark_name}@${ref.remote_name}`;
+            navigator.clipboard.writeText(name);
+        } else if ($currentContext?.type == "Ref") {
             new RefMutator($currentContext.ref, $ignoreToggled).handle(event);
         }
         $currentContext = null;

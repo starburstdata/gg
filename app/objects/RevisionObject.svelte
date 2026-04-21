@@ -23,6 +23,21 @@
     export let onClick: ((header: RevHeader) => void) | undefined = undefined;
     export let onShiftClick: ((header: RevHeader) => void) | undefined = undefined;
 
+    let forkMenu: { label: string; x: number; y: number } | null = null;
+
+    function onForkContextMenu(event: MouseEvent, label: string) {
+        event.preventDefault();
+        event.stopPropagation();
+        forkMenu = { label, x: event.clientX, y: event.clientY };
+    }
+
+    function copyForkName() {
+        if (forkMenu) {
+            navigator.clipboard.writeText(forkMenu.label);
+            forkMenu = null;
+        }
+    }
+
     $: operand = (child ? { type: "Parent", header, child } : { type: "Revision", header }) as Operand;
 
     // Refs overflow: chips render in visual order forks → bookmarks → tags → workspace.
@@ -363,7 +378,7 @@
                         </div>
                     {/if}
                     {#each hiddenForks as label, i}
-                        <div data-chip style:display={plan.forkShown[i] !== false ? null : "none"}>
+                        <div data-chip role="presentation" style:display={plan.forkShown[i] !== false ? null : "none"} on:contextmenu={(e) => onForkContextMenu(e, label)}>
                             <Chip
                                 context={false}
                                 target={false}
@@ -412,6 +427,20 @@
         </Zone>
     {/if}
 </Object>
+
+<svelte:window on:click={() => (forkMenu = null)} />
+
+{#if forkMenu}
+    <div
+        class="fork-menu"
+        style="left: {forkMenu.x}px; top: {forkMenu.y}px;"
+        role="menu"
+        tabindex="0"
+        on:click|stopPropagation
+        on:keydown={(e) => e.key === "Escape" && (forkMenu = null)}>
+        <button on:click={copyForkName}>Copy name</button>
+    </div>
+{/if}
 
 <style>
     .layout {
@@ -485,6 +514,32 @@
 
         .email {
             display: initial;
+        }
+    }
+
+    .fork-menu {
+        position: fixed;
+        z-index: 1000;
+        background: var(--ctp-surface0);
+        border: 1px solid var(--ctp-overlay0);
+        border-radius: 3px;
+        box-shadow: 2px 2px var(--ctp-text);
+
+        button {
+            width: 100%;
+            display: block;
+            border: none;
+            padding: 4px 12px;
+            text-align: left;
+            background: none;
+            color: var(--ctp-text);
+            font-family: var(--stack-industrial);
+            cursor: pointer;
+
+            &:hover {
+                background: var(--ctp-flamingo);
+                color: black;
+            }
         }
     }
 </style>
