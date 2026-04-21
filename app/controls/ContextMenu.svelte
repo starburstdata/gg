@@ -47,6 +47,14 @@
         }
     }
 
+    function copyChangeId() {
+        let ids = getRevisionHeaders()
+            .map((h) => h.id.change.prefix + h.id.change.rest)
+            .join("\n");
+        navigator.clipboard.writeText(ids);
+        onClose();
+    }
+
     function isRevisionEnabled(headers: RevHeader[], ignoreImmutable: boolean = false) {
         const isSingleton = headers.length == 1;
         const anyImmutable = !ignoreImmutable && headers.some((h) => h.is_immutable);
@@ -141,6 +149,8 @@
         <button disabled={!revisionEnabled.restore} on:click={() => onClick("restore")}>Restore from parent</button>
         <hr />
         <button disabled={!revisionEnabled.bookmark} on:click={() => onClick("bookmark")}>Create bookmark...</button>
+        <hr />
+        <button on:click={copyChangeId}>Copy change ID</button>
     {:else if operand.type === "Change" && changeEnabled}
         <button disabled={!changeEnabled.squash} on:click={() => onClick("squash")}>Squash into parent</button>
         <button disabled={!changeEnabled.restore} on:click={() => onClick("restore")}>Restore from parent</button>

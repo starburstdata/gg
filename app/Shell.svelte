@@ -230,7 +230,16 @@
     }
 
     function mutateRevision(event: string) {
-        if ($currentContext?.type == "Revision") {
+        if (event === "copy_change_id") {
+            let headers =
+                $currentContext?.type == "Revision"
+                    ? [$currentContext.header]
+                    : $currentContext?.type == "Revisions"
+                      ? $currentContext.headers
+                      : [];
+            let ids = headers.map((h) => h.id.change.prefix + h.id.change.rest).join("\n");
+            navigator.clipboard.writeText(ids);
+        } else if ($currentContext?.type == "Revision") {
             new RevisionMutator([$currentContext.header], $ignoreToggled).handle(event);
         } else if ($currentContext?.type == "Revisions") {
             new RevisionMutator($currentContext.headers, $ignoreToggled).handle(event);
