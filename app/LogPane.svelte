@@ -290,22 +290,28 @@
         if (page.type == "data") {
             graphRows = [];
             graphRows = addPageToGraph(graphRows, page.value.rows);
+            let hasMorePages = page.value.has_more;
 
+            // fast initial paint: select row 0 before loading the rest so the user sees
+            // the first page immediately. subsequent pages arrive asynchronously.
             if (selectFirst && page.value.rows.length > 0) {
                 setSelection(0, 0);
             }
 
-            while (page.value.has_more) {
+            // always drain remaining pages: a FromNode line can span page boundaries, and
+            // its passingLines on earlier rows are only populated when the target row (on a
+            // later page) is processed. stopping at page 1 leaves those lines unrendered.
+            while (hasMorePages) {
                 let next_page = await query<LogPage>("query_log_next_page", null);
                 if (next_page.type == "data") {
                     graphRows = addPageToGraph(graphRows, next_page.value.rows);
-                    page = next_page;
+                    hasMorePages = next_page.value.has_more;
                 } else {
+                    hasMorePages = false;
                     break;
                 }
             }
 
-            // XXX perhaps we should retry this after each page
             if (!selectFirst) {
                 syncSelectionWithGraph();
             }
