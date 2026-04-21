@@ -14,7 +14,7 @@
 
     <svelte:fragment slot="commands">
         {#if onClose}
-            <ActionWidget tip="close dialog" safe onClick={onClose}>OK</ActionWidget>
+            <ActionWidget tip="close dialog" modal onClick={onClose}>OK</ActionWidget>
         {/if}
     </svelte:fragment>
 </ModalDialog>

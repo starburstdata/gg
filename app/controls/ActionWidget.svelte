@@ -3,17 +3,17 @@
 
     export let tip: string = "";
     export let onClick: (event: MouseEvent) => void;
-    export let safe: boolean = false;
+    export let modal: boolean = false;
     export let secondary: boolean = false;
     export let primary: boolean = false;
     export let disabled: boolean = false;
 
-    $: isDisabled = disabled || (!safe && $hasModal);
+    $: isDisabled = disabled || (!modal && $hasModal);
 </script>
 
 <button
     disabled={isDisabled}
-    class:safe
+    class:modal
     class:secondary
     class:primary
     on:click|stopPropagation={isDisabled ? undefined : onClick}

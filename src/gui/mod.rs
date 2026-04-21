@@ -129,6 +129,8 @@ fn resolve_set(
 }
 
 pub fn run_gui(options: super::RunOptions) -> Result<()> {
+    gg_lib::theme::ensure_bundled_themes();
+
     let recent_workspaces = options.settings.ui_recent_workspaces();
 
     let app = tauri::Builder::default()

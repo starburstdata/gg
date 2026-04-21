@@ -109,8 +109,8 @@
         {/if}
     {/each}
     <svelte:fragment slot="commands">
-        <ActionWidget safe secondary onClick={onCancel}>Cancel</ActionWidget>
-        <ActionWidget safe primary onClick={onEnter}>Enter</ActionWidget>
+        <ActionWidget modal secondary onClick={onCancel}>Cancel</ActionWidget>
+        <ActionWidget modal primary onClick={onEnter}>Enter</ActionWidget>
     </svelte:fragment>
 </ModalDialog>
 

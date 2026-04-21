@@ -65,7 +65,7 @@
 {#if !dropHint}
     <div id="status-bar" class="repo-bar" inert={$hasModal}>
         <div class="substatus">
-            <ToggleWidget tip="ignore immutability" bind:checked={$ignoreToggled} safe on="shield-off" off="shield" />
+            <ToggleWidget tip="ignore immutability" bind:checked={$ignoreToggled} on="shield-off" off="shield" />
             <span id="status-workspace">
                 {$repoConfigEvent?.type == "Workspace" ? $repoConfigEvent.absolute_path : "No workspace"}
             </span>

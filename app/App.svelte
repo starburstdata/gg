@@ -143,6 +143,6 @@
 
     .separator:hover,
     .two-pane.dragging .separator {
-        background: var(--gg-colors-surfaceAlt);
+        background: var(--gg-colors-surfaceStrong);
     }
 </style>

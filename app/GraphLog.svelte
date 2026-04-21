@@ -89,6 +89,7 @@
 <svg class="graph" style="width: 100%; height: {graphHeight}px;">
     {#each visibleSlice as row, i (i)}
         <g transform="translate({(row?.location[0] ?? 0) * columnWidth} {(row?.location[1] ?? 0) * rowHeight})">
+            <!-- -12: stops the row selection highlight before the graph nodes, which are SVG siblings outside this foreignObject -->
             <foreignObject
                 class:placeholder={row === null}
                 height={rowHeight}
