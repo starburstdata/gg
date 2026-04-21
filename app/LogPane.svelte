@@ -293,6 +293,11 @@
 
     async function loadLog(selectFirst: boolean) {
         const epoch = ++loadEpoch;
+        // passNextRow can carry stale lines from a cancelled load. lineKey must stay
+        // monotonic so reload produces fresh keys — otherwise Svelte's keyed {#each}
+        // reuses GraphLine components, whose path is computed in a non-reactive let
+        // block and won't update to the new line's geometry.
+        passNextRow = [];
         let page = await query<LogPage>(
             "query_log",
             {
