@@ -55,6 +55,18 @@
         onClose();
     }
 
+    function copyRefName() {
+        if (operand.type !== "Ref") return;
+        let name =
+            operand.ref.type === "Tag"
+                ? operand.ref.tag_name
+                : operand.ref.type === "LocalBookmark"
+                  ? operand.ref.bookmark_name
+                  : `${operand.ref.bookmark_name}@${operand.ref.remote_name}`;
+        navigator.clipboard.writeText(name);
+        onClose();
+    }
+
     function isRevisionEnabled(headers: RevHeader[], ignoreImmutable: boolean = false) {
         const isSingleton = headers.length == 1;
         const anyImmutable = !ignoreImmutable && headers.some((h) => h.is_immutable);
@@ -166,6 +178,8 @@
         <hr />
         <button disabled={!refEnabled.rename} on:click={() => onClick("rename")}>Rename...</button>
         <button disabled={!refEnabled.delete} on:click={() => onClick("delete")}>Delete</button>
+        <hr />
+        <button on:click={copyRefName}>Copy name</button>
     {:else if operand.type === "Workspace"}
         <button on:click={() => onClick("rename")}>Rename...</button>
         <button on:click={() => onClick("forget")}>Forget</button>
