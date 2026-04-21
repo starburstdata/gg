@@ -25,7 +25,7 @@
 <style>
     button {
         height: 24px;
-        font-size: 16px;
+        font-size: 1rem;
         padding: 1px 6px;
 
         outline: none;

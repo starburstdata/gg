@@ -21,7 +21,7 @@
 
         color: var(--ctp-sapphire);
         font-family: var(--stack-industrial);
-        font-size: 16px;
+        font-size: 1rem;
 
         display: flex;
         align-items: center;

@@ -55,7 +55,7 @@
         cursor: pointer;
         text-decoration: none;
         font-family: var(--stack-code);
-        font-size: 18px;
+        font-size: 1.125rem;
         padding: 0;
 
         &:hover {

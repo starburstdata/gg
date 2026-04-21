@@ -1,6 +1,8 @@
 package com.jjuicy.intellij
 
 import com.intellij.ide.ui.LafManagerListener
+import com.intellij.ide.ui.UISettings
+import com.intellij.ide.ui.UISettingsListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
@@ -91,6 +93,16 @@ class GGBrowserPanel(
         )
     }
 
+    // match the IDE's UI font size so GG text is proportional to surrounding panels
+    private fun applyFontSize(jbBrowser: JBCefBrowser) {
+        val fontSize = UISettings.getInstance().fontSize2D
+        jbBrowser.cefBrowser.executeJavaScript(
+            "document.documentElement.style.fontSize = '${fontSize}px';",
+            jbBrowser.cefBrowser.url,
+            0
+        )
+    }
+
     private fun showBrowser(url: String) {
         val jbBrowser = JBCefBrowser.createBuilder()
             .setUrl("$url?embedded")
@@ -131,16 +143,20 @@ class GGBrowserPanel(
                     if (frame?.isMain == true) {
                         applyScheme(jbBrowser)
                         applyEmbeddedMode(jbBrowser)
+                        applyFontSize(jbBrowser)
                     }
                 }
             },
             jbBrowser.cefBrowser
         )
 
-        // re-apply whenever the user changes the IDE theme at runtime
+        // re-apply whenever the user changes the IDE theme or font size at runtime
         ApplicationManager.getApplication().messageBus
             .connect(parentDisposable)
             .subscribe(LafManagerListener.TOPIC, LafManagerListener { applyScheme(jbBrowser) })
+        ApplicationManager.getApplication().messageBus
+            .connect(parentDisposable)
+            .subscribe(UISettingsListener.TOPIC, UISettingsListener { applyFontSize(jbBrowser) })
 
         Disposer.register(parentDisposable, jbBrowser)
 
