@@ -186,11 +186,29 @@ fn resolve_variant(doc: &toml_edit::DocumentMut, variant: &str) -> Result<ThemeT
         }
     }
 
+    // re-resolve iteratively until no progress — resolves forward refs and ref chains
+    loop {
+        let mut progress = false;
+        let keys: Vec<String> = tokens.keys().cloned().collect();
+        for key in keys {
+            let value = tokens[&key].clone();
+            if value.contains('$') {
+                let resolved = resolve_refs(&value, &tokens);
+                if resolved != value {
+                    tokens.insert(key, resolved);
+                    progress = true;
+                }
+            }
+        }
+        if !progress {
+            break;
+        }
+    }
+
     Ok(tokens)
 }
 
 /// Replace `$section.key` references with their resolved values.
-/// Single-pass: only references to already-resolved tokens work.
 fn resolve_refs(value: &str, tokens: &ThemeTokens) -> String {
     if !value.contains('$') {
         return value.to_string();

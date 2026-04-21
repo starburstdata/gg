@@ -56,7 +56,6 @@ use super::{WorkerSession, git_util::get_git_remote_names};
 use crate::{
     config::{GGSettings, read_config},
     messages::{self, *},
-    theme,
 };
 
 /// Loaded state of the worker thread, with borrowed JJ data.
@@ -115,8 +114,6 @@ impl From<BackendError> for RevsetError {
 
 impl WorkerSession {
     pub async fn load_workspace(&mut self, cwd: &Path) -> Result<WorkspaceSession<'_>> {
-        theme::ensure_bundled_themes();
-
         let factory = DefaultWorkspaceLoaderFactory;
         let loader = factory.create(find_workspace_dir(cwd))?;
 

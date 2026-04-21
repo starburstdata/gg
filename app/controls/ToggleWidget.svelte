@@ -1,16 +1,15 @@
 <script lang="ts">
-    import { dragOverWidget, hasModal } from "../stores";
+    import { dragOverWidget } from "../stores";
     import Icon from "./Icon.svelte";
 
     export let tip: string = "";
     export let checked: boolean;
-    export let safe: boolean = false;
     export let secondary: boolean = false;
     export let disabled: boolean = false;
     export let on: string;
     export let off: string;
 
-    $: isDisabled = disabled || (!safe && $hasModal);
+    $: isDisabled = disabled;
 
     function toggle() {
         if (!isDisabled) {
@@ -21,7 +20,6 @@
 
 <button
     {disabled}
-    class:safe
     class:secondary
     class:checked
     on:click={toggle}
@@ -44,7 +42,7 @@
         border-color: var(--gg-colors-outline);
         box-shadow: var(--gg-shadows-shadowSm);
 
-        background: var(--gg-colors-accent);
+        background: var(--gg-colors-success);
         color: black;
 
         font-family: var(--gg-text-familyUi);
@@ -57,7 +55,7 @@
 
     button:not(:disabled) {
         &:hover {
-            background: var(--gg-colors-accentHover);
+            background: var(--gg-colors-success);
             box-shadow: var(--gg-shadows-shadowMd);
         }
         &:focus-visible {
@@ -79,15 +77,9 @@
     button.checked:not(:disabled) {
         margin: var(--active-margin);
         box-shadow: var(--gg-components-buttonActiveShadow);
+        background: var(--gg-colors-error);
         &:focus-visible {
             padding: 1px 1px 0px 2px;
-        }
-    }
-
-    button.safe {
-        background: var(--gg-colors-success);
-        &:hover {
-            background: var(--gg-colors-success);
         }
     }
 
