@@ -28,7 +28,7 @@ pub fn init() -> TauriPlugin<Wry> {
                             // avoid main-thread deadlock
                             let app = app.clone();
                             tauri::async_runtime::spawn(async move {
-                                if let Err(e) = try_create_window(&app, Some(path.clone())) {
+                                if let Err(e) = try_create_window(&app, Some(path.clone()), None) {
                                     log::error!("Failed to open workspace {:?}: {}", path, e);
                                 }
                             });

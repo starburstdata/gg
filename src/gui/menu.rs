@@ -650,7 +650,7 @@ pub fn handle_event(window: &Window, event: MenuEvent) -> Result<()> {
             let path = PathBuf::from(&recent_id["recent:".len()..]);
             let app_handle = window.app_handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = super::try_create_window(&app_handle, Some(path)) {
+                if let Err(e) = super::try_create_window(&app_handle, Some(path), None) {
                     log::error!("Failed to open recent workspace: {e:#}");
                 }
             });
