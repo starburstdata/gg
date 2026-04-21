@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from "svelte";
     import type { LogPage } from "./messages/LogPage.js";
     import type { LogRow } from "./messages/LogRow.js";
     import type { RevHeader } from "./messages/RevHeader";
@@ -117,12 +116,20 @@
         },
     };
 
-    onMount(() => {
-        loadLog(true);
-    });
-
     $: choices = getChoices(entered_query, presets);
-    $: if ($repoStatusEvent) reloadLog();
+
+    // dedupe repoStatusEvent — it fires multiple times during the startup handshake
+    // with identical content. first change drives the initial fast-path load; later
+    // genuine changes drive a full reload so we can relocate the previous selection.
+    let lastStatusKey: string | null = null;
+    $: if ($repoStatusEvent) {
+        let key = JSON.stringify($repoStatusEvent);
+        if (key !== lastStatusKey) {
+            let isFirst = lastStatusKey === null;
+            lastStatusKey = key;
+            loadLog(isFirst);
+        }
+    }
 
     // index rows by commit hex so selection and per-row lookups stay O(1) as the graph grows
     $: rowIdxByHex = (() => {
