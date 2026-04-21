@@ -10,9 +10,11 @@ import com.intellij.ide.ui.UISettingsListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.JBColor
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
@@ -44,6 +46,7 @@ class GGBrowserPanel(
 
     private var browser: JBCefBrowser? = null
     private var jsQueryBridge: JBCefJSQuery? = null
+    private var activeDiffFile: VirtualFile? = null
 
     init {
         if (!JBCefApp.isSupported()) {
@@ -178,7 +181,12 @@ class GGBrowserPanel(
                         "Before",
                         "After",
                     )
+
+                    val editorManager = FileEditorManager.getInstance(project)
+                    activeDiffFile?.let { editorManager.closeFile(it) }
+                    val openBefore = editorManager.openFiles.toSet()
                     DiffManager.getInstance().showDiff(project, request)
+                    activeDiffFile = (editorManager.openFiles.toSet() - openBefore).firstOrNull()
                 }
             } catch (e: Exception) {
                 LOG.warn("Failed to open IntelliJ diff view", e)
@@ -268,6 +276,7 @@ class GGBrowserPanel(
     fun dispose() {
         processManager.removeListener(this)
         jsQueryBridge = null
+        activeDiffFile = null
         browser?.let { Disposer.dispose(it) }
         browser = null
     }
