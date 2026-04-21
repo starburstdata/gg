@@ -298,6 +298,7 @@
         // reuses GraphLine components, whose path is computed in a non-reactive let
         // block and won't update to the new line's geometry.
         passNextRow = [];
+        locationIdxMap.clear();
         let page = await query<LogPage>(
             "query_log",
             {
@@ -378,6 +379,10 @@
     // augment rows with all lines that pass through them
     let lineKey = 0;
     let passNextRow: EnhancedLine[] = [];
+    // map from backend location[1] (which skips slots for missing-parent terminators)
+    // to graph array index — avoids an O(N) findIndex per line as the log grows.
+    let locationIdxMap = new Map<number, number>();
+
     function addPageToGraph(graph: EnhancedRow[], page: LogRow[]): EnhancedRow[] {
         for (let row of page) {
             let enhancedRow = row as EnhancedRow;
@@ -386,6 +391,10 @@
             }
             enhancedRow.passingLines = passNextRow;
             passNextRow = [];
+
+            let rowIdx = graph.length;
+            graph.push(enhancedRow);
+            locationIdxMap.set(enhancedRow.location[1], rowIdx);
 
             for (let line of enhancedRow.lines) {
                 let enhancedLine = line as EnhancedLine;
@@ -398,20 +407,16 @@
                     passNextRow.push(enhancedLine);
                 } else {
                     // other lines end at their owning row, so we need to add them to all previous rows and then this one.
-                    // line.source[1] / line.target[1] are row numbers from the backend's coordinate
-                    // system, which skip rows for missing-parent terminators — so they don't map 1:1
-                    // to graph indices. find the source row and walk indices between source and target.
                     enhancedLine.parent = row.revision;
-                    let sourceIdx = graph.findIndex((r) => r.location[1] == line.source[1]);
+                    let sourceIdx = locationIdxMap.get(line.source[1]);
+                    if (sourceIdx === undefined) continue; // defensive: source row unknown
                     enhancedLine.child = graph[sourceIdx].revision;
-                    for (let i = sourceIdx; i < graph.length && graph[i].location[1] < line.target[1]; i++) {
+                    for (let i = sourceIdx; i < rowIdx && graph[i].location[1] < line.target[1]; i++) {
                         graph[i].passingLines.push(enhancedLine);
                     }
                     enhancedRow.passingLines.push(enhancedLine);
                 }
             }
-
-            graph.push(enhancedRow);
         }
 
         return graph;
