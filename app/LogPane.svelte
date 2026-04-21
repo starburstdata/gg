@@ -278,7 +278,14 @@
         reloadLog();
     }
 
+    // epoch-based cancellation: a new loadLog bumps the epoch, discarding any
+    // in-flight page from a previous call. prevents startup races where repeated
+    // repoStatusEvents would concurrently mutate graphRows and the shared
+    // graph-building state (passNextRow, lineKey) below.
+    let loadEpoch = 0;
+
     async function loadLog(selectFirst: boolean) {
+        const epoch = ++loadEpoch;
         let page = await query<LogPage>(
             "query_log",
             {
@@ -286,6 +293,7 @@
             },
             () => (graphRows = undefined),
         );
+        if (epoch !== loadEpoch) return;
 
         if (page.type == "data") {
             graphRows = [];
@@ -303,6 +311,7 @@
             // later page) is processed. stopping at page 1 leaves those lines unrendered.
             while (hasMorePages) {
                 let next_page = await query<LogPage>("query_log_next_page", null);
+                if (epoch !== loadEpoch) return;
                 if (next_page.type == "data") {
                     graphRows = addPageToGraph(graphRows, next_page.value.rows);
                     hasMorePages = next_page.value.has_more;
