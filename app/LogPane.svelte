@@ -92,12 +92,8 @@
             }
 
             // translate from toplogical from::to to listwidget's anchor::extension
-            const revSetFromIdx = graphRows.findIndex(
-                (row) => row.revision.id.commit.hex === $revisionSelectEvent!.from.commit.hex,
-            );
-            const revSetToIdx = graphRows.findIndex(
-                (row) => row.revision.id.commit.hex === $revisionSelectEvent!.to.commit.hex,
-            );
+            const revSetFromIdx = rowIdxByHex.get($revisionSelectEvent!.from.commit.hex) ?? -1;
+            const revSetToIdx = rowIdxByHex.get($revisionSelectEvent!.to.commit.hex) ?? -1;
 
             const extensionIdx = revSetFromIdx === selectionAnchorIdx ? revSetToIdx : revSetFromIdx;
 
@@ -128,15 +124,29 @@
     $: choices = getChoices(entered_query, presets);
     $: if ($repoStatusEvent) reloadLog();
 
-    function isInSelectedRange(row: EnhancedRow, selection: typeof $revisionSelectEvent): boolean {
-        if (!selection || !graphRows) return false;
-        const fromIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === selection.from.commit.hex);
-        const toIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === selection.to.commit.hex);
-        const rowIdx = graphRows.indexOf(row);
-        if (fromIdx === -1 || toIdx === -1 || rowIdx === -1) return false;
-        const minIdx = Math.min(fromIdx, toIdx);
-        const maxIdx = Math.max(fromIdx, toIdx);
-        return rowIdx >= minIdx && rowIdx <= maxIdx;
+    // index rows by commit hex so selection and per-row lookups stay O(1) as the graph grows
+    $: rowIdxByHex = (() => {
+        let map = new Map<string, number>();
+        if (graphRows) {
+            for (let i = 0; i < graphRows.length; i++) {
+                map.set(graphRows[i].revision.id.commit.hex, i);
+            }
+        }
+        return map;
+    })();
+
+    $: selectionRange = (() => {
+        if (!$revisionSelectEvent || !graphRows) return null;
+        let a = rowIdxByHex.get($revisionSelectEvent.from.commit.hex);
+        let b = rowIdxByHex.get($revisionSelectEvent.to.commit.hex);
+        if (a === undefined || b === undefined) return null;
+        return { min: Math.min(a, b), max: Math.max(a, b) };
+    })();
+
+    function isInSelectedRange(row: EnhancedRow, range: { min: number; max: number } | null): boolean {
+        if (!range) return false;
+        let idx = rowIdxByHex.get(row.revision.id.commit.hex);
+        return idx !== undefined && idx >= range.min && idx <= range.max;
     }
 
     /**
@@ -188,7 +198,7 @@
     function handleClick(header: RevHeader) {
         if (!graphRows) return;
 
-        const clickedIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === header.id.commit.hex);
+        const clickedIdx = rowIdxByHex.get(header.id.commit.hex) ?? -1;
         if (clickedIdx !== -1) {
             setSelection(clickedIdx, clickedIdx);
         }
@@ -200,7 +210,7 @@
             return;
         }
 
-        const clickedIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === header.id.commit.hex);
+        const clickedIdx = rowIdxByHex.get(header.id.commit.hex) ?? -1;
         if (clickedIdx === -1) {
             handleClick(header); // invalid selection
             return;
@@ -309,8 +319,8 @@
             return;
         }
 
-        let fromIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === selection.from.commit.hex);
-        let toIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === selection.to.commit.hex);
+        let fromIdx = rowIdxByHex.get(selection.from.commit.hex) ?? -1;
+        let toIdx = rowIdxByHex.get(selection.to.commit.hex) ?? -1;
 
         if (fromIdx === -1) {
             fromIdx = graphRows.findIndex((r) => sameChange(r.revision.id.change, selection.from.change));
@@ -417,7 +427,7 @@
                     <RevisionObject
                         header={row.revision}
                         hiddenForks={row.hidden_forks}
-                        selected={isInSelectedRange(row, $revisionSelectEvent)}
+                        selected={isInSelectedRange(row, selectionRange)}
                         onClick={handleClick}
                         onShiftClick={handleShiftClick} />
                 {/if}
