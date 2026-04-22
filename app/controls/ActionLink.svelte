@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { dragOverWidget } from "../stores";
+    import { dragOverWidget, mouseOverWidget } from "../stores";
 
     export let tip: string = "";
     export let onClick: (event: MouseEvent) => void;
 </script>
 
-<button on:click|stopPropagation={onClick} on:dragenter={dragOverWidget} on:dragover={dragOverWidget} title={tip}>
+<button on:click|stopPropagation={onClick} on:dragenter={dragOverWidget} on:dragover={dragOverWidget} on:mouseenter={mouseOverWidget} title={tip}>
     <slot />
 </button>
 
@@ -21,7 +21,7 @@
 
         color: var(--ctp-sapphire);
         font-family: var(--stack-industrial);
-        font-size: 16px;
+        font-size: 1rem;
 
         display: flex;
         align-items: center;

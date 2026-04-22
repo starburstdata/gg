@@ -38,11 +38,11 @@ use jj_lib::{
     tree_merge::MergeOptions,
 };
 
-use crate::messages::{
-    ChangeHunk, ChangeLocation, ChangeRange, MultilineString, RevSet, queries::*,
-};
 #[cfg(test)]
-use crate::messages::{RevHeader, RevId};
+use crate::messages::RevHeader;
+use crate::messages::{
+    ChangeHunk, ChangeLocation, ChangeRange, MultilineString, RevId, RevSet, TreePath, queries::*,
+};
 
 use super::{WorkspaceSession, git_util::get_git_remote_names};
 
@@ -827,11 +827,11 @@ fn format_conflict_hunks(
             ));
             let base_content = removes[0];
             let side_content = adds[other_idx];
-            let diff_hunks =
-                get_unified_hunks(3, base_content.as_ref(), side_content.as_ref())?;
+            let diff_hunks = get_unified_hunks(3, base_content.as_ref(), side_content.as_ref())?;
             if diff_hunks.is_empty() {
                 // base and kept side are identical
-                cur.lines.push(format!(" +++++++ {kept_label} (unchanged)\n"));
+                cur.lines
+                    .push(format!(" +++++++ {kept_label} (unchanged)\n"));
                 for line in String::from_utf8_lossy(side_content).lines() {
                     cur.lines.push(format!(" {line}\n"));
                     cur.from_len += 1;
@@ -1263,4 +1263,34 @@ fn diff_by_line<'input, T: AsRef<[u8]> + ?Sized + 'input>(
 
 fn commit_id_identity(commit_id: &CommitId) -> &CommitId {
     commit_id
+}
+
+/// Returns the before/after file content for a changed file at a specific revision.
+pub async fn query_file_content(
+    ws: &WorkspaceSession<'_>,
+    id: RevId,
+    path: TreePath,
+) -> Result<FileContentResult> {
+    let commit = ws.resolve_change_id(&id)?;
+    let parents = commit.parents().await?;
+    let parent_tree = rewrite::merge_commit_trees(ws.repo(), &parents).await?;
+    let commit_tree = commit.tree();
+    let repo_path = RepoPath::from_internal_string(&path.repo_path)?;
+    let store = ws.repo().store().clone();
+
+    let before_bytes = super::mutations::read_file_content(&store, &parent_tree, repo_path).await?;
+    let after_bytes = super::mutations::read_file_content(&store, &commit_tree, repo_path).await?;
+
+    let before = if before_bytes.is_empty() {
+        None
+    } else {
+        Some(String::from_utf8_lossy(&before_bytes).into_owned())
+    };
+    let after = if after_bytes.is_empty() {
+        None
+    } else {
+        Some(String::from_utf8_lossy(&after_bytes).into_owned())
+    };
+
+    Ok(FileContentResult { before, after })
 }

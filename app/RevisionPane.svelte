@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { RevsResult } from "./messages/RevsResult";
-    import { ignoreToggled, changeSelectEvent, dragOverWidget } from "./stores";
+    import { ignoreToggled, changeSelectEvent, dragOverWidget, mouseOverWidget } from "./stores";
     import ChangeObject from "./objects/ChangeObject.svelte";
     import HunkObject from "./objects/HunkObject.svelte";
     import RevisionObject from "./objects/RevisionObject.svelte";
@@ -11,7 +11,7 @@
     import Pane from "./shell/Pane.svelte";
     import ToggleWidget from "./controls/ToggleWidget.svelte";
     import Zone from "./objects/Zone.svelte";
-    import { onEvent } from "./ipc";
+    import { onEvent, isEmbedded } from "./ipc";
     import AuthorSpan from "./controls/AuthorSpan.svelte";
 
     import SetSpan from "./controls/SetSpan.svelte";
@@ -22,6 +22,7 @@
     export let revs: Extract<RevsResult, { type: "Detail" }>;
 
     let expandedFiles = new Set<string>();
+    let embedded = isEmbedded();
 
     let changeIds = new Map<string, string>();
     $: {
@@ -37,6 +38,16 @@
         while (el && el !== event.currentTarget) {
             let path = el.id ? changeIds.get(el.id) : undefined;
             if (path) {
+                if (embedded && window.__gg_openDiff) {
+                    // in IntelliJ, open the native diff viewer instead of expanding inline
+                    let change = syntheticChanges.find((c) => c.path.repo_path === path);
+                    if (change) {
+                        window.__gg_openDiff(
+                            JSON.stringify({ id: newest.id, path: change.path }),
+                        );
+                    }
+                    return;
+                }
                 if (expandedFiles.has(path)) {
                     expandedFiles.delete(path);
                 } else {
@@ -190,15 +201,17 @@
     <div slot="body" class="body">
         {#if !singleton}
             <!-- prettier-ignore -->
-            <div class="description-list">{#each revs.headers as header, i}{#if i > 0}<hr class="description-divider" />{/if}<div class="description-row">{header.description.lines.join("\n")}</div>{/each}</div>
+            <div class="description-list" class:embedded>{#each revs.headers as header, i}{#if i > 0}<hr class="description-divider" />{/if}<div class="description-row">{header.description.lines.join("\n")}</div>{/each}</div>
         {:else}
             <textarea
                 class="description"
+                class:embedded
                 spellcheck="false"
                 disabled={newestImmutable}
                 bind:value={editableDescription}
                 on:dragenter={dragOverWidget}
                 on:dragover={dragOverWidget}
+                on:mouseenter={mouseOverWidget}
                 on:keydown={(ev) => {
                     if (descriptionChanged && ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {
                         updateDescription();
@@ -368,6 +381,10 @@
         overflow: auto;
     }
 
+    .description.embedded {
+        min-height: 45px;
+    }
+
     .description-list {
         min-height: 90px;
         pointer-events: auto;
@@ -380,6 +397,10 @@
         user-select: text;
 
         color: var(--ctp-subtext0);
+    }
+
+    .description-list.embedded {
+        min-height: 45px;
     }
 
     .description-row {

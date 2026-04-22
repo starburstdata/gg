@@ -7,8 +7,8 @@ use axum::{Json, Router, extract::State, routing::post};
 use serde::Deserialize;
 
 use crate::messages::{
-    RepoConfig, RepoStatus, RevSet,
-    queries::{LogPage, RevsResult},
+    RepoConfig, RepoStatus, RevId, RevSet, TreePath,
+    queries::{FileContentResult, LogPage, RevsResult},
 };
 use crate::worker::SessionEvent;
 
@@ -24,6 +24,7 @@ pub fn router() -> Router<AppState> {
         .route("/query_remotes", post(query_remotes))
         .route("/query_recent_workspaces", post(query_recent_workspaces))
         .route("/query_snapshot", post(query_snapshot))
+        .route("/query_file_content", post(query_file_content))
 }
 
 #[derive(Deserialize)]
@@ -139,5 +140,25 @@ async fn query_snapshot(
     let (tx, rx) = channel();
     state.worker_tx.send(SessionEvent::ExecuteSnapshot { tx })?;
     let result = rx.recv()?;
+    Ok(Json(result))
+}
+
+#[derive(Deserialize)]
+pub struct QueryFileContentRequest {
+    id: RevId,
+    path: TreePath,
+}
+
+async fn query_file_content(
+    State(state): State<AppState>,
+    Json(req): Json<QueryFileContentRequest>,
+) -> Result<Json<FileContentResult>, ApiError> {
+    let (tx, rx) = channel();
+    state.worker_tx.send(SessionEvent::QueryFileContent {
+        tx,
+        id: req.id,
+        path: req.path,
+    })?;
+    let result = rx.recv()??;
     Ok(Json(result))
 }

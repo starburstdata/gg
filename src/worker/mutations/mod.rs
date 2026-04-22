@@ -710,7 +710,7 @@ impl Mutation for RenameWorkspace {
     }
 }
 
-async fn read_file_content(
+pub(crate) async fn read_file_content(
     store: &Arc<Store>,
     tree: &MergedTree,
     path: &RepoPath,

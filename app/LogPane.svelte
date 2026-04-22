@@ -447,6 +447,6 @@
 
     input {
         font-family: var(--stack-code);
-        font-size: 14px;
+        font-size: 0.875rem;
     }
 </style>

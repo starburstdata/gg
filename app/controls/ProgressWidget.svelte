@@ -27,7 +27,7 @@
     .progress-label {
         margin: 0;
         color: black;
-        font-size: 16px;
+        font-size: 1rem;
     }
 
     progress {

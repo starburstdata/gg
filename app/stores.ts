@@ -5,7 +5,7 @@ import type { RepoStatus } from "./messages/RepoStatus";
 import type { RevHeader } from "./messages/RevHeader";
 import type { RevSet } from "./messages/RevSet";
 import type { Operand } from "./messages/Operand";
-import { writable } from "svelte/store";
+import { writable, get } from "svelte/store";
 import { event, type Query } from "./events";
 import type { InputRequest } from "./messages/InputRequest";
 import type { InputResponse } from "./messages/InputResponse";
@@ -33,4 +33,12 @@ export const selectionHeaders = writable<RevHeader[]>([]);
 export function dragOverWidget(event: DragEvent) {
     event.stopPropagation();
     currentTarget.set(null);
+}
+
+// same as dragOverWidget but for mouse events in embedded JCEF contexts
+export function mouseOverWidget(event: MouseEvent) {
+    if (get(currentSource)) {
+        event.stopPropagation();
+        currentTarget.set(null);
+    }
 }

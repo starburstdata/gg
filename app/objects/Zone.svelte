@@ -7,6 +7,7 @@ A drop target for direct-manipulation objects.
     import type { Operand } from "../messages/Operand";
     import BinaryMutator from "../mutators/BinaryMutator";
     import { currentSource, currentTarget, ignoreToggled } from "../stores";
+    import { isEmbedded } from "../ipc";
 
     interface $$Slots {
         default: { target: boolean; hint: string | null };
@@ -17,6 +18,7 @@ A drop target for direct-manipulation objects.
 
     let dropHint: string | null = null;
     let target = false;
+    let embedded = isEmbedded();
     $: target = match($currentTarget);
 
     function match(target: Operand | null): boolean {
@@ -26,22 +28,21 @@ A drop target for direct-manipulation objects.
         );
     }
 
-    function onDragOver(event: DragEvent) {
-        event.stopPropagation();
-
+    // shared logic for dragover / mouseenter
+    function enterZone(canPreventDefault?: () => void) {
         let canDrop =
             operand == null
                 ? { type: "no", hint: "" }
                 : new BinaryMutator($currentSource!, operand, $ignoreToggled).canDrop();
 
         if (canDrop.type == "yes") {
-            event.preventDefault();
+            canPreventDefault?.();
             if (!match($currentTarget)) {
                 $currentTarget = operand;
             }
             dropHint = null;
         } else if (canDrop.type == "maybe") {
-            event.preventDefault();
+            canPreventDefault?.();
             dropHint = canDrop.hint;
             if (alwaysTarget && !match($currentTarget)) {
                 $currentTarget = operand;
@@ -49,14 +50,14 @@ A drop target for direct-manipulation objects.
         }
     }
 
-    function onDragLeave(event: DragEvent) {
+    // shared logic for dragleave / mouseleave
+    function leaveZone() {
         $currentTarget = null;
         dropHint = null;
     }
 
-    function onDrop(event: DragEvent) {
-        event.stopPropagation();
-
+    // shared logic for drop / mouseup
+    function dropOnZone() {
         if (operand) {
             let mutator = new BinaryMutator($currentSource!, operand, $ignoreToggled);
             if (mutator.canDrop().type == "yes") {
@@ -68,6 +69,38 @@ A drop target for direct-manipulation objects.
         $currentTarget = null;
         dropHint = null;
     }
+
+    function onDragOver(event: DragEvent) {
+        event.stopPropagation();
+        enterZone(() => event.preventDefault());
+    }
+
+    function onDragLeave(event: DragEvent) {
+        leaveZone();
+    }
+
+    function onDrop(event: DragEvent) {
+        event.stopPropagation();
+        dropOnZone();
+    }
+
+    // mouse-based equivalents for embedded JCEF contexts
+    function onMouseEnter(event: MouseEvent) {
+        if (!embedded || !$currentSource) return;
+        event.stopPropagation();
+        enterZone();
+    }
+
+    function onMouseLeave(event: MouseEvent) {
+        if (!embedded || !$currentSource) return;
+        leaveZone();
+    }
+
+    function onMouseUp(event: MouseEvent) {
+        if (!embedded || !$currentSource) return;
+        event.stopPropagation();
+        dropOnZone();
+    }
 </script>
 
 <div
@@ -77,7 +110,10 @@ A drop target for direct-manipulation objects.
     on:dragenter={onDragOver}
     on:dragover={onDragOver}
     on:dragleave={onDragLeave}
-    on:drop={onDrop}>
+    on:drop={onDrop}
+    on:mouseenter={onMouseEnter}
+    on:mouseleave={onMouseLeave}
+    on:mouseup={onMouseUp}>
     <slot {target} hint={dropHint} />
 </div>
 

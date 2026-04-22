@@ -79,7 +79,7 @@
         min-width: 30px;
 
         font-family: var(--stack-code);
-        font-size: 14px;
+        font-size: 0.875rem;
     }
     #dialog-content :global(select),
     #dialog-content :global(input[type="text"]),

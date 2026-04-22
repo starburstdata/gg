@@ -89,6 +89,12 @@ pub enum SessionEvent {
     QueryLogNextPage {
         tx: Sender<Result<messages::queries::LogPage>>,
     },
+    /// Read the before/after file content for a changed file at a revision.
+    QueryFileContent {
+        tx: Sender<Result<messages::queries::FileContentResult>>,
+        id: messages::RevId,
+        path: messages::TreePath,
+    },
     /// Snapshot the working copy if it has changed since the last check.
     /// Returns `Some` when the working-copy commit was updated.
     ExecuteSnapshot {
@@ -273,6 +279,9 @@ impl Session for WorkspaceSession<'_> {
                 }
                 SessionEvent::QueryRevisions { tx, set } => {
                     tx.send(queries::query_revisions(&self, set).await)?
+                }
+                SessionEvent::QueryFileContent { tx, id, path } => {
+                    tx.send(queries::query_file_content(&self, id, path).await)?
                 }
                 SessionEvent::QueryRemotes {
                     tx,
@@ -467,6 +476,9 @@ impl Session for QuerySession<'_, '_> {
             match evt {
                 Ok(SessionEvent::QueryRevisions { tx, set }) => {
                     tx.send(queries::query_revisions(self.ws, set).await)?
+                }
+                Ok(SessionEvent::QueryFileContent { tx, id, path }) => {
+                    tx.send(queries::query_file_content(self.ws, id, path).await)?
                 }
                 Ok(SessionEvent::QueryRemotes {
                     tx,

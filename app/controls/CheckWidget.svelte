@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { dragOverWidget } from "../stores";
+    import { dragOverWidget, mouseOverWidget } from "../stores";
 
     export let id: string | null = null;
     export let checked: boolean;
 </script>
 
-<input {id} type="checkbox" bind:checked on:dragenter={dragOverWidget} on:dragover={dragOverWidget} />
+<input {id} type="checkbox" bind:checked on:dragenter={dragOverWidget} on:dragover={dragOverWidget} on:mouseenter={mouseOverWidget} />
 
 <style>
     input:focus-visible {
