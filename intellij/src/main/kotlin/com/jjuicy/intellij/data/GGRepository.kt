@@ -37,11 +37,13 @@ class GGRepository(private val project: Project) : Disposable {
 
     @PublishedApi internal var client: GGHttpClient? = null
     private var sseThread: Thread? = null
+    private var pollThread: Thread? = null
 
     /** Called by GGMainPanel once GGProcessManager reports the backend URL. */
     fun initialize(baseUrl: String) {
         client = GGHttpClient(baseUrl)
         startSse()
+        startPolling()
     }
 
     val isReady: Boolean get() = client != null
@@ -102,9 +104,40 @@ class GGRepository(private val project: Project) : Disposable {
         }
     }
 
+    // polls query_snapshot every 3s — returns null when nothing changed, non-null when the repo
+    // changed (either external jj op or working-copy snapshot). VFS events are not reliable for
+    // .jj/ directory changes, so polling is the fallback.
+    private fun startPolling() {
+        pollThread?.interrupt()
+        pollThread = Thread({
+            while (!Thread.currentThread().isInterrupted) {
+                try {
+                    Thread.sleep(3000)
+                    val c = client ?: continue
+                    val changed = c.query<QueryWorkspaceReq, RepoStatus?>("query_snapshot", QueryWorkspaceReq())
+                    if (changed != null && !project.isDisposed) {
+                        ApplicationManager.getApplication().invokeLater {
+                            if (!project.isDisposed) {
+                                project.messageBus.syncPublisher(GG_LOG_CHANGED).onLogChanged()
+                            }
+                        }
+                    }
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                } catch (e: Exception) {
+                    LOG.debug("snapshot poll: ${e.message}")
+                }
+            }
+        }, "gg-snapshot-poller")
+        pollThread!!.isDaemon = true
+        pollThread!!.start()
+    }
+
     override fun dispose() {
         sseThread?.interrupt()
         sseThread = null
+        pollThread?.interrupt()
+        pollThread = null
         client = null
     }
 
