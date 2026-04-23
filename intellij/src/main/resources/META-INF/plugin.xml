@@ -19,9 +19,6 @@
             icon="/icons/gg-icon.svg"/>
 
         <projectService
-            serviceImplementation="com.jjuicy.intellij.GGProcessManager"/>
-
-        <projectService
             serviceImplementation="com.jjuicy.intellij.data.GGRepository"/>
 
         <applicationService

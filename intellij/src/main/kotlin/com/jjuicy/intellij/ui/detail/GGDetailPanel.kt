@@ -176,15 +176,12 @@ class GGDetailPanel(private val project: Project) : JPanel(BorderLayout()) {
         val newDesc = descArea.text
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                GGRepository.getInstance(project).mutate(
-                    "describe_revision",
-                    DescribeRevision(id = id, new_description = newDesc)
-                )
+                GGRepository.getInstance(project).describeRevision(id, newDesc)
                 ApplicationManager.getApplication().invokeLater {
                     project.messageBus.syncPublisher(GG_LOG_CHANGED).onLogChanged()
                 }
             } catch (e: Exception) {
-                LOG.warn("describe_revision failed", e)
+                LOG.warn("describeRevision failed", e)
                 ApplicationManager.getApplication().invokeLater {
                     javax.swing.JOptionPane.showMessageDialog(
                         this@GGDetailPanel, e.message ?: "Unknown error",

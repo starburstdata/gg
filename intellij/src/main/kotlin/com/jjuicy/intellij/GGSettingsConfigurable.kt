@@ -10,28 +10,28 @@ import javax.swing.JPanel
 /**
  * Settings page under Settings → Tools → jjuicy.
  *
- * Allows configuring the path to the gg/jjuicy binary.
+ * Allows configuring the path to the jj binary.
  */
 class GGSettingsConfigurable : Configurable {
 
     private var panel: JPanel? = null
-    private val binaryPathField = TextFieldWithBrowseButton()
+    private val jjPathField = TextFieldWithBrowseButton()
 
     override fun getDisplayName(): String = "jjuicy"
 
     override fun createComponent(): JComponent {
-        binaryPathField.addBrowseFolderListener(
+        jjPathField.addBrowseFolderListener(
             null,
             com.intellij.openapi.fileChooser.FileChooserDescriptor(
                 true, false, false, false, false, false
-            ).withTitle("Select jjuicy/gg Binary")
-                .withDescription("Choose the path to the jjuicy or gg executable")
+            ).withTitle("Select jj Binary")
+                .withDescription("Choose the path to the jj executable (leave blank to use PATH)")
         )
 
         panel = FormBuilder.createFormBuilder()
             .addLabeledComponent(
-                JBLabel("Binary path:"),
-                binaryPathField,
+                JBLabel("jj binary path:"),
+                jjPathField,
                 1,
                 false
             )
@@ -42,16 +42,14 @@ class GGSettingsConfigurable : Configurable {
         return panel!!
     }
 
-    override fun isModified(): Boolean {
-        return binaryPathField.text != GGSettings.instance.binaryPath
-    }
+    override fun isModified(): Boolean = jjPathField.text != GGSettings.instance.jjPath
 
     override fun apply() {
-        GGSettings.instance.binaryPath = binaryPathField.text
+        GGSettings.instance.jjPath = jjPathField.text
     }
 
     override fun reset() {
-        binaryPathField.text = GGSettings.instance.binaryPath
+        jjPathField.text = GGSettings.instance.jjPath
     }
 
     override fun disposeUIResources() {

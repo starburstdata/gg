@@ -5,13 +5,9 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.openapi.vfs.newvfs.BulkFileListener
-import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
-import com.jjuicy.intellij.GGProcessManager
 import com.jjuicy.intellij.data.GGRepository
 import com.jjuicy.intellij.data.GG_LOG_CHANGED
 import com.jjuicy.intellij.data.RevId
@@ -32,14 +28,13 @@ private val LOG = logger<GGMainPanel>()
 /**
  * Root panel for the jjuicy tool window.
  *
- * Shows a loading state while the backend is starting, then switches to a
- * horizontal split: [GGLogPanel] on the left, [GGDetailPanel] on the right.
+ * Initialises immediately (no backend startup); shows an error label if jj
+ * is not available. Splits into [GGLogPanel] and [GGDetailPanel].
  */
 class GGMainPanel(
     private val project: Project,
-    private val processManager: GGProcessManager,
     private val parentDisposable: Disposable,
-) : JPanel(BorderLayout()), GGProcessManager.ProcessListener {
+) : JPanel(BorderLayout()) {
 
     private val logPanel = GGLogPanel(project)
     private val detailPanel = GGDetailPanel(project)
@@ -47,52 +42,38 @@ class GGMainPanel(
     private var splitter: JBSplitter? = null
 
     init {
-        showLoadingState()
-        processManager.addListener(this)
+        val repo = GGRepository.getInstance(project)
 
-        // refresh on SSE events from backend
-        project.messageBus.connect(parentDisposable).subscribe(GG_LOG_CHANGED, object : GGRepository.LogListener {
-            override fun onLogChanged() {
-                val id = lastSelectedId
-                logPanel.loadLog()  // keeps current revset
-                if (id != null) logPanel.reselectRevision(id)
-            }
-        })
-
-        // refresh when external jj commands change the repo (VFS fires on IDE focus-regain)
-        project.messageBus.connect(parentDisposable).subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
-            override fun after(events: MutableList<out VFileEvent>) {
-                val jjPath = "${project.basePath}/.jj/"
-                if (events.any { it.path.startsWith(jjPath) } && GGRepository.getInstance(project).isReady) {
-                    project.messageBus.syncPublisher(GG_LOG_CHANGED).onLogChanged()
-                }
-            }
-        })
-
-        // detail updates when selection changes
-        project.messageBus.connect(parentDisposable).subscribe(GG_REVISION_SELECTED, object : GGLogPanel.SelectionListener {
-            override fun onRevisionSelected(set: RevSet) {
-                lastSelectedId = set.from
-                detailPanel.showRevision(set)
-            }
-        })
-    }
-
-    override fun onReady(url: String) {
-        ApplicationManager.getApplication().invokeLater {
-            LOG.info("gg web ready at $url, initialising native UI")
-            val repo = GGRepository.getInstance(project)
-            repo.initialize(url)
+        if (!repo.isReady) {
+            showMessage("jj not found.\nInstall jj or set the path in Settings → Tools → jjuicy.")
+        } else {
             showContent()
-            // query_workspace must be called first — it triggers OpenWorkspace on the backend
-            // worker, transitioning it from WorkerSession to WorkspaceSession so that
-            // subsequent QueryLog requests are handled correctly.
+            repo.startWatching()
+
+            // refresh on any detected repo change
+            project.messageBus.connect(parentDisposable).subscribe(GG_LOG_CHANGED, object : GGRepository.LogListener {
+                override fun onLogChanged() {
+                    val id = lastSelectedId
+                    logPanel.loadLog()
+                    if (id != null) logPanel.reselectRevision(id)
+                }
+            })
+
+            // detail updates when selection changes
+            project.messageBus.connect(parentDisposable).subscribe(GG_REVISION_SELECTED, object : GGLogPanel.SelectionListener {
+                override fun onRevisionSelected(set: RevSet) {
+                    lastSelectedId = set.from
+                    detailPanel.showRevision(set)
+                }
+            })
+
+            // load initial log on a background thread
             ApplicationManager.getApplication().executeOnPooledThread {
                 try {
                     val config = repo.loadWorkspace()
                     val initialRevset = when (config) {
                         is com.jjuicy.intellij.data.RepoConfig.Workspace -> config.latest_query
-                        else -> null
+                        else -> "all()"
                     }
                     ApplicationManager.getApplication().invokeLater {
                         logPanel.loadLog(initialRevset)
@@ -100,30 +81,18 @@ class GGMainPanel(
                 } catch (e: Exception) {
                     LOG.warn("Failed to load workspace config", e)
                     ApplicationManager.getApplication().invokeLater {
-                        logPanel.loadLog(null)
+                        logPanel.loadLog("all()")
                     }
                 }
             }
         }
     }
 
-    override fun onCrashed() {
-        ApplicationManager.getApplication().invokeLater {
-            showMessage("The jjuicy backend crashed.\nUse the notification to restart it.")
-        }
-    }
-
     fun dispose() {
-        processManager.removeListener(this)
+        // parentDisposable handles subscriptions
     }
 
     // --- Layout helpers ---
-
-    private fun showLoadingState() {
-        removeAll()
-        add(label("Starting jjuicy…"), BorderLayout.CENTER)
-        revalidate(); repaint()
-    }
 
     private fun showMessage(text: String) {
         removeAll()
@@ -182,7 +151,6 @@ class GGMainPanel(
         border = JBUI.Borders.empty(16)
     }
 
-    /** Placeholder action shown when an action ID is not yet registered. */
     private class PlaceholderAction(name: String) : AnAction(name) {
         override fun actionPerformed(e: AnActionEvent) {}
     }

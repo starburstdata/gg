@@ -17,8 +17,8 @@ import com.intellij.openapi.components.Storage
 class GGSettings : PersistentStateComponent<GGSettings.State> {
 
     data class State(
-        // path to the gg/jjuicy binary; blank means auto-discover from PATH
-        var binaryPath: String = "",
+        // path to the jj binary; blank means auto-discover from PATH
+        var jjPath: String = "",
     )
 
     private var state = State()
@@ -29,9 +29,9 @@ class GGSettings : PersistentStateComponent<GGSettings.State> {
         this.state = state
     }
 
-    var binaryPath: String
-        get() = state.binaryPath
-        set(value) { state.binaryPath = value }
+    var jjPath: String
+        get() = state.jjPath
+        set(value) { state.jjPath = value }
 
     companion object {
         val instance: GGSettings

@@ -25,12 +25,10 @@ class GGToolWindowFactory : ToolWindowFactory, DumbAware {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         LOG.info("Creating jjuicy native tool window for project ${project.name}")
 
-        val processManager = GGProcessManager.getInstance(project)
-
         val panelDisposable = Disposer.newDisposable("jjuicy-main-panel")
         Disposer.register(toolWindow.disposable, panelDisposable)
 
-        val panel = GGMainPanel(project, processManager, panelDisposable)
+        val panel = GGMainPanel(project, panelDisposable)
 
         val content = ContentFactory.getInstance().createContent(panel, null, false)
         content.setDisposer(Disposable {

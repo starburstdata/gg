@@ -8,6 +8,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.messages.Topic
 import com.intellij.util.ui.JBUI
+import com.jjuicy.intellij.actions.chooseRemote
 import com.jjuicy.intellij.actions.performMutation
 import com.jjuicy.intellij.data.*
 import java.awt.Cursor
@@ -51,7 +52,6 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     private val scrollPane = JBScrollPane(table)
     private var currentRevset = ""
-    private var isLoadingMore = false
     private lateinit var revsetField: JTextField
 
     // bookmark drag state
@@ -72,13 +72,6 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                     val set = RevSet(from = id, to = id)
                     project.messageBus.syncPublisher(GG_REVISION_SELECTED).onRevisionSelected(set)
                 }
-            }
-        }
-
-        // Load more rows when scrolled to bottom
-        scrollPane.viewport.addChangeListener {
-            if (!isLoadingMore && tableModel.hasMore && isScrolledToBottom()) {
-                loadNextPage()
             }
         }
 
@@ -107,7 +100,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                     if (targetRow >= 0 && targetRow != dragSourceRow) {
                         val targetHeader = tableModel.getEnhancedRow(targetRow).row.revision
                         runMutation("Move bookmark ${ref.bookmark_name}") {
-                            GGRepository.getInstance(project).mutate("move_ref", MoveRef(ref = ref, to_id = targetHeader.id))
+                            GGRepository.getInstance(project).moveBookmark(ref, targetHeader.id)
                         }
                     }
                     dragRef = null
@@ -143,13 +136,13 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         return panel
     }
 
-    /** Load (or reload) the log. Pass a non-null [revset] to also update the displayed revset field. */
+    /** Load (or reload) the log. Pass a non-null [revset] to also update the revset field. */
     fun loadLog(revset: String? = null) {
         if (revset != null) {
             currentRevset = revset
             revsetField.text = revset
         }
-        if (currentRevset.isBlank()) return  // backend not ready yet
+        if (currentRevset.isBlank()) return
         tableModel.markLoading()
 
         ApplicationManager.getApplication().executeOnPooledThread {
@@ -158,43 +151,15 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val page = repo.loadLog(currentRevset)
                 ApplicationManager.getApplication().invokeLater {
                     tableModel.setPage(page)
-                    // auto-select first row
                     if (tableModel.rowCount > 0) {
                         table.selectionModel.setSelectionInterval(0, 0)
                     }
                 }
-                // load remaining pages
-                var current = page
-                while (current.has_more) {
-                    val next = repo.loadNextPage()
-                    ApplicationManager.getApplication().invokeLater {
-                        tableModel.appendPage(next)
-                    }
-                    current = next
-                }
             } catch (e: Exception) {
                 LOG.warn("Failed to load log", e)
                 ApplicationManager.getApplication().invokeLater {
-                    tableModel.appendPage(com.jjuicy.intellij.data.LogPage(emptyList(), false))
+                    tableModel.appendPage(LogPage(emptyList(), false))
                 }
-            }
-        }
-    }
-
-    private fun loadNextPage() {
-        if (isLoadingMore) return
-        isLoadingMore = true
-
-        ApplicationManager.getApplication().executeOnPooledThread {
-            try {
-                val page = GGRepository.getInstance(project).loadNextPage()
-                ApplicationManager.getApplication().invokeLater {
-                    tableModel.appendPage(page)
-                    isLoadingMore = false
-                }
-            } catch (e: Exception) {
-                LOG.warn("Failed to load next page", e)
-                isLoadingMore = false
             }
         }
     }
@@ -211,13 +176,6 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
     }
 
-    private fun isScrolledToBottom(): Boolean {
-        val vp = scrollPane.viewport
-        val viewRect = vp.viewRect
-        val viewSize = vp.viewSize
-        return viewRect.y + viewRect.height >= viewSize.height - GGGraphPainter.ROW_HEIGHT
-    }
-
     // --- Context menu, double-click, and drag actions ---
 
     private fun localBookmarkAtPoint(p: Point): Pair<Int, StoreRef.LocalBookmark>? {
@@ -225,8 +183,6 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (row < 0) return null
         val cellRect = table.getCellRect(row, 0, false)
         val cellPoint = Point(p.x - cellRect.x, p.y - cellRect.y)
-        // prepareRenderer returns a shared stamp component whose children have no bounds set
-        // unless we force a layout pass matching the cell's actual dimensions.
         val cellComp = table.prepareRenderer(table.getCellRenderer(row, 0), row, 0)
         cellComp.setSize(cellRect.width, cellRect.height)
         forceLayout(cellComp)
@@ -235,7 +191,6 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         return if (ref != null) Pair(row, ref) else null
     }
 
-    /** Recursively calls doLayout() — needed for off-screen renderer components where validate() is a no-op. */
     private fun forceLayout(c: java.awt.Component) {
         if (c is java.awt.Container) {
             c.doLayout()
@@ -246,7 +201,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun editRevision(header: RevHeader) {
         if (header.is_working_copy || header.is_immutable) return
         runMutation("Edit revision") {
-            GGRepository.getInstance(project).mutate("checkout_revision", CheckoutRevision(id = header.id))
+            GGRepository.getInstance(project).checkoutRevision(header.id)
         }
     }
 
@@ -261,9 +216,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         menu.add(JMenuItem("New Child").apply {
             addActionListener {
                 runMutation("New child") {
-                    GGRepository.getInstance(project).mutate(
-                        "create_revision", CreateRevision(set = RevSet(header.id, header.id))
-                    )
+                    GGRepository.getInstance(project).createRevision(header.id)
                 }
             }
         })
@@ -276,12 +229,8 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         menu.add(JMenuItem("Squash into Parent").apply {
             isEnabled = !header.is_immutable && header.parent_ids.size == 1
             addActionListener {
-                val parentId = header.parent_ids.first()
                 runMutation("Squash into parent") {
-                    GGRepository.getInstance(project).mutate(
-                        "move_changes",
-                        MoveChanges(from = RevSet(header.id, header.id), to_id = parentId)
-                    )
+                    GGRepository.getInstance(project).squashIntoParent(header.id)
                 }
             }
         })
@@ -293,9 +242,8 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val name = Messages.showInputDialog(
                     project, "Bookmark name:", "Create Bookmark", null
                 ) ?: return@addActionListener
-                val ref = StoreRef.LocalBookmark(name, false, false, emptyList(), 0, 0)
                 runMutation("Create bookmark") {
-                    GGRepository.getInstance(project).mutate("create_ref", CreateRef(id = header.id, ref = ref))
+                    GGRepository.getInstance(project).createBookmark(name, header.id)
                 }
             }
         })
@@ -314,7 +262,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val ref = visibleBookmarks.find { it.bookmark_name == choice }
                     ?: StoreRef.LocalBookmark(choice, false, false, emptyList(), 0, 0)
                 runMutation("Move bookmark") {
-                    GGRepository.getInstance(project).mutate("move_ref", MoveRef(ref = ref, to_id = header.id))
+                    GGRepository.getInstance(project).moveBookmark(ref, header.id)
                 }
             }
         })
@@ -323,39 +271,11 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
             menu.add(JMenuItem("Push Bookmark '${clickedBookmark.bookmark_name}'…").apply {
                 addActionListener {
                     ApplicationManager.getApplication().executeOnPooledThread {
-                        try {
-                            val remotes = GGRepository.getInstance(project).loadRemotes()
-                            val remote = when {
-                                remotes.isEmpty() -> {
-                                    var name: String? = null
-                                    ApplicationManager.getApplication().invokeAndWait {
-                                        name = Messages.showInputDialog(project, "Remote name:", "Push Bookmark", null)
-                                    }
-                                    name ?: return@executeOnPooledThread
-                                }
-                                remotes.size == 1 -> remotes[0]
-                                else -> {
-                                    var chosen: String? = null
-                                    ApplicationManager.getApplication().invokeAndWait {
-                                        chosen = Messages.showEditableChooseDialog(
-                                            "Select remote to push to:", "Push Bookmark",
-                                            null, remotes.toTypedArray(), remotes[0], null
-                                        )
-                                    }
-                                    chosen ?: return@executeOnPooledThread
-                                }
-                            }
-                            performMutation(project, "jj git push", "git_push") {
-                                GitPush(refspec = GitRefspec.RemoteBookmark(
-                                    remote_name = remote,
-                                    bookmark_ref = clickedBookmark,
-                                ))
-                            }
-                        } catch (e: Exception) {
-                            LOG.warn("Push bookmark failed", e)
-                            ApplicationManager.getApplication().invokeLater {
-                                Messages.showErrorDialog(project, e.message ?: "Unknown error", "jjuicy")
-                            }
+                        val remotes = GGRepository.getInstance(project).loadRemotes()
+                        val remote = chooseRemote(project, remotes, "Push Bookmark")
+                            ?: return@executeOnPooledThread
+                        performMutation(project, "jj git push") {
+                            GGRepository.getInstance(project).gitPush(remote, clickedBookmark.bookmark_name)
                         }
                     }
                 }
@@ -368,9 +288,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
             isEnabled = !header.is_immutable && !header.is_working_copy
             addActionListener {
                 runMutation("Abandon revision") {
-                    GGRepository.getInstance(project).mutate(
-                        "abandon_revisions", AbandonRevisions(set = RevSet(header.id, header.id))
-                    )
+                    GGRepository.getInstance(project).abandonRevisions(header.id)
                 }
             }
         })
@@ -384,6 +302,11 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 block()
                 ApplicationManager.getApplication().invokeLater {
                     project.messageBus.syncPublisher(GG_LOG_CHANGED).onLogChanged()
+                }
+            } catch (e: com.jjuicy.intellij.jj.JJException) {
+                LOG.warn("$description failed: ${e.message}")
+                ApplicationManager.getApplication().invokeLater {
+                    Messages.showErrorDialog(project, e.message ?: "Unknown error", "jjuicy")
                 }
             } catch (e: Exception) {
                 LOG.warn("$description failed", e)
