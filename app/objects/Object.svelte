@@ -175,6 +175,10 @@ Core component for direct-manipulation objects. A drag&drop source.
     }
 
     .selected :global(.prefix) {
+        color: var(--gg-colors-accentSelected);
+    }
+
+    .selected :global(.divergent) {
         color: var(--gg-colors-highlight);
     }
 
@@ -209,7 +213,7 @@ Core component for direct-manipulation objects. A drag&drop source.
     }
 
     .selected.conflict :global(.id) {
-        color: var(--gg-colors-foreground);
+        color: var(--gg-colors-warningContent);
     }
 
     .selected.conflict :global(.prefix) {

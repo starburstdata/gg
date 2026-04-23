@@ -55,7 +55,7 @@ conflictFill = "#fe640b"
 
 # accents
 accent = "#1e66f5"
-accentHover = "#209fb5"
+accentSelected = "#209fb5"
 accentMuted = "#8839ef"
 accentSubtle = "#04a5e5"
 highlight = "#fe640b"
@@ -203,7 +203,7 @@ conflictStroke = "#f9e2af"
 conflictFill = "#fab387"
 
 accent = "#89b4fa"
-accentHover = "#74c7ec"
+accentSelected = "#74c7ec"
 accentMuted = "#cba6f7"
 accentSubtle = "#94e2d5"
 highlight = "#fab387"
