@@ -326,13 +326,16 @@ data class GitPush(val refspec: GitRefspec, val input: InputResponse? = null)
 data class GitFetch(val refspec: GitRefspec, val input: InputResponse? = null)
 
 @Serializable
-data class CreateRef(val id: RevId, val ref_name: String)
+data class MoveChanges(val from: RevSet, val to_id: CommitId, val paths: List<TreePath> = emptyList())
 
 @Serializable
-data class DeleteRef(val ref_name: String)
+data class CreateRef(val id: RevId, val ref: StoreRef)
 
 @Serializable
-data class MoveRef(val ref_name: String, val to_id: RevId)
+data class DeleteRef(val ref: StoreRef)
 
 @Serializable
-data class RenameBookmark(val ref_name: String, val new_name: String)
+data class MoveRef(val ref: StoreRef, val to_id: RevId)
+
+@Serializable
+data class RenameBookmark(val ref: StoreRef, val new_name: String)

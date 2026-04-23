@@ -3,13 +3,12 @@ package com.jjuicy.intellij.ui.log
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
-import com.intellij.util.ui.JBUI
-import com.jjuicy.intellij.data.GGRepository
-import com.jjuicy.intellij.data.RevId
-import com.jjuicy.intellij.data.RevSet
 import com.intellij.util.messages.Topic
+import com.intellij.util.ui.JBUI
+import com.jjuicy.intellij.data.*
 import java.awt.BorderLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -74,6 +73,18 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 loadNextPage()
             }
         }
+
+        // Double-click to edit; right-click for context menu
+        table.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                if (e.clickCount == 2) {
+                    val row = table.rowAtPoint(e.point)
+                    if (row >= 0) editRevision(tableModel.getEnhancedRow(row).row.revision)
+                }
+            }
+            override fun mousePressed(e: MouseEvent) { if (e.isPopupTrigger) showContextMenu(e) }
+            override fun mouseReleased(e: MouseEvent) { if (e.isPopupTrigger) showContextMenu(e) }
+        })
     }
 
     private fun buildHeaderPanel(): JPanel {
@@ -163,5 +174,115 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         val viewRect = vp.viewRect
         val viewSize = vp.viewSize
         return viewRect.y + viewRect.height >= viewSize.height - GGGraphPainter.ROW_HEIGHT
+    }
+
+    // --- Context menu & double-click actions ---
+
+    private fun editRevision(header: RevHeader) {
+        if (header.is_working_copy || header.is_immutable) return
+        runMutation("Edit revision") {
+            GGRepository.getInstance(project).mutate("checkout_revision", CheckoutRevision(id = header.id))
+        }
+    }
+
+    private fun showContextMenu(e: MouseEvent) {
+        val row = table.rowAtPoint(e.point)
+        if (row < 0) return
+        table.selectionModel.setSelectionInterval(row, row)
+        val header = tableModel.getEnhancedRow(row).row.revision
+
+        val menu = JPopupMenu()
+
+        menu.add(JMenuItem("New Child").apply {
+            addActionListener {
+                runMutation("New child") {
+                    GGRepository.getInstance(project).mutate(
+                        "create_revision", CreateRevision(set = RevSet(header.id, header.id))
+                    )
+                }
+            }
+        })
+
+        menu.add(JMenuItem("Edit (Make Working Copy)").apply {
+            isEnabled = !header.is_working_copy && !header.is_immutable
+            addActionListener { editRevision(header) }
+        })
+
+        menu.add(JMenuItem("Squash into Parent").apply {
+            isEnabled = !header.is_immutable && header.parent_ids.size == 1
+            addActionListener {
+                val parentId = header.parent_ids.first()
+                runMutation("Squash into parent") {
+                    GGRepository.getInstance(project).mutate(
+                        "move_changes",
+                        MoveChanges(from = RevSet(header.id, header.id), to_id = parentId)
+                    )
+                }
+            }
+        })
+
+        menu.addSeparator()
+
+        menu.add(JMenuItem("Create Bookmark…").apply {
+            addActionListener {
+                val name = Messages.showInputDialog(
+                    project, "Bookmark name:", "Create Bookmark", null
+                ) ?: return@addActionListener
+                val ref = StoreRef.LocalBookmark(name, false, false, emptyList(), 0, 0)
+                runMutation("Create bookmark") {
+                    GGRepository.getInstance(project).mutate("create_ref", CreateRef(id = header.id, ref = ref))
+                }
+            }
+        })
+
+        val visibleBookmarks = (0 until tableModel.rowCount)
+            .flatMap { tableModel.getEnhancedRow(it).row.revision.refs }
+            .filterIsInstance<StoreRef.LocalBookmark>()
+            .distinctBy { it.bookmark_name }
+        menu.add(JMenuItem("Move Bookmark Here…").apply {
+            isEnabled = visibleBookmarks.isNotEmpty()
+            addActionListener {
+                val names = visibleBookmarks.map { it.bookmark_name }.toTypedArray()
+                val choice = Messages.showEditableChooseDialog(
+                    "Select bookmark to move:", "Move Bookmark Here", null, names, names[0], null
+                ) ?: return@addActionListener
+                val ref = visibleBookmarks.find { it.bookmark_name == choice }
+                    ?: StoreRef.LocalBookmark(choice, false, false, emptyList(), 0, 0)
+                runMutation("Move bookmark") {
+                    GGRepository.getInstance(project).mutate("move_ref", MoveRef(ref = ref, to_id = header.id))
+                }
+            }
+        })
+
+        menu.addSeparator()
+
+        menu.add(JMenuItem("Abandon").apply {
+            isEnabled = !header.is_immutable && !header.is_working_copy
+            addActionListener {
+                runMutation("Abandon revision") {
+                    GGRepository.getInstance(project).mutate(
+                        "abandon_revisions", AbandonRevisions(set = RevSet(header.id, header.id))
+                    )
+                }
+            }
+        })
+
+        menu.show(table, e.x, e.y)
+    }
+
+    private fun runMutation(description: String, block: () -> Unit) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                block()
+                ApplicationManager.getApplication().invokeLater {
+                    project.messageBus.syncPublisher(GG_LOG_CHANGED).onLogChanged()
+                }
+            } catch (e: Exception) {
+                LOG.warn("$description failed", e)
+                ApplicationManager.getApplication().invokeLater {
+                    Messages.showErrorDialog(project, e.message ?: "Unknown error", "jjuicy")
+                }
+            }
+        }
     }
 }
