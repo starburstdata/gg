@@ -193,9 +193,9 @@ accentMuted = "#D93025"
 accentSubtle = "#7A1A14"
 highlight = "#FF9F0A"
 
-selectionBackground = "#0A84FF"
+selectionBackground = "#32426B"
 selectionForeground = "#ffffff"
-selectionForegroundMuted = "#48484a"
+selectionForegroundMuted = "#aeaeb2"
 focusRing = "#0A84FF"
 
 overlayBackground = "rgba(29, 29, 31, 0.6)"
