@@ -5,6 +5,9 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
@@ -53,6 +56,16 @@ class GGMainPanel(
                 val id = lastSelectedId
                 logPanel.loadLog()  // keeps current revset
                 if (id != null) logPanel.reselectRevision(id)
+            }
+        })
+
+        // refresh when external jj commands change the repo (VFS fires on IDE focus-regain)
+        project.messageBus.connect(parentDisposable).subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
+            override fun after(events: MutableList<out VFileEvent>) {
+                val jjPath = "${project.basePath}/.jj/"
+                if (events.any { it.path.startsWith(jjPath) } && GGRepository.getInstance(project).isReady) {
+                    project.messageBus.syncPublisher(GG_LOG_CHANGED).onLogChanged()
+                }
             }
         })
 
@@ -150,7 +163,6 @@ class GGMainPanel(
 
     private fun buildToolbar(): ActionToolbar {
         val group = DefaultActionGroup().apply {
-            add(ActionManager.getInstance().getAction("GG.Refresh") ?: PlaceholderAction("Refresh"))
             add(ActionManager.getInstance().getAction("GG.Undo") ?: PlaceholderAction("Undo"))
             addSeparator()
             add(ActionManager.getInstance().getAction("GG.Push") ?: PlaceholderAction("Push"))

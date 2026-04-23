@@ -43,10 +43,6 @@
 
     <actions>
         <group id="GG.Toolbar" text="jjuicy Toolbar" popup="false">
-            <action id="GG.Refresh"
-                    class="com.jjuicy.intellij.actions.GGRefreshAction"
-                    text="Refresh"
-                    description="Reload the commit log"/>
             <action id="GG.Undo"
                     class="com.jjuicy.intellij.actions.GGUndoAction"
                     text="Undo"
