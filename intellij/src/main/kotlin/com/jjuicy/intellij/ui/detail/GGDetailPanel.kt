@@ -9,6 +9,8 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import com.jjuicy.intellij.data.*
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
 import java.awt.BorderLayout
 import java.awt.Font
 import java.awt.GridBagConstraints
@@ -36,14 +38,20 @@ class GGDetailPanel(private val project: Project) : JPanel(BorderLayout()) {
         lineWrap = true
         wrapStyleWord = true
         isEditable = false
+        addKeyListener(object : KeyAdapter() {
+            override fun keyPressed(e: KeyEvent) {
+                if ((e.isControlDown || e.isMetaDown) && e.keyCode == KeyEvent.VK_ENTER) {
+                    saveDescBtn.doClick()
+                    e.consume()
+                }
+            }
+        })
     }
-    private val descScrollPane = JBScrollPane(descArea).apply {
-        border = JBUI.Borders.empty()
-    }
+    private val descScrollPane = JBScrollPane(descArea)
 
     private val saveDescBtn = JButton("Save").apply {
         isEnabled = false
-        toolTipText = "Save description (jj describe)"
+        toolTipText = "Save description — ⌘↵ / Ctrl+Enter"
         addActionListener { saveDescription() }
     }
 
@@ -127,6 +135,13 @@ class GGDetailPanel(private val project: Project) : JPanel(BorderLayout()) {
             gridx = 0; gridy = 0
         }
 
+        val descLabel = JBLabel("Description").apply {
+            foreground = JBColor.GRAY
+            font = font.deriveFont(Font.BOLD, font.size.toFloat())
+            border = JBUI.Borders.emptyBottom(2)
+        }
+        panel.add(descLabel, gc); gc.gridy++
+
         // description with save button
         val descRow = JPanel(BorderLayout(4, 0))
         descRow.add(descScrollPane, BorderLayout.CENTER)
@@ -165,8 +180,17 @@ class GGDetailPanel(private val project: Project) : JPanel(BorderLayout()) {
                     "describe_revision",
                     DescribeRevision(id = id, new_description = newDesc)
                 )
+                ApplicationManager.getApplication().invokeLater {
+                    project.messageBus.syncPublisher(GG_LOG_CHANGED).onLogChanged()
+                }
             } catch (e: Exception) {
                 LOG.warn("describe_revision failed", e)
+                ApplicationManager.getApplication().invokeLater {
+                    javax.swing.JOptionPane.showMessageDialog(
+                        this@GGDetailPanel, e.message ?: "Unknown error",
+                        "jjuicy", javax.swing.JOptionPane.ERROR_MESSAGE
+                    )
+                }
             }
         }
     }
