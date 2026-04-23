@@ -18,6 +18,8 @@ import com.jjuicy.intellij.ui.log.GGLogPanel
 import com.jjuicy.intellij.ui.log.GG_REVISION_SELECTED
 import java.awt.BorderLayout
 import java.awt.Font
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.SwingConstants
@@ -39,6 +41,7 @@ class GGMainPanel(
     private val logPanel = GGLogPanel(project)
     private val detailPanel = GGDetailPanel(project)
     private var lastSelectedId: RevId? = null
+    private var splitter: JBSplitter? = null
 
     init {
         showLoadingState()
@@ -118,14 +121,31 @@ class GGMainPanel(
     private fun showContent() {
         removeAll()
         val toolbar = buildToolbar()
-        val splitter = JBSplitter(false, 0.40f).apply {
+        val s = JBSplitter(false, 0.40f).apply {
             firstComponent = logPanel
             secondComponent = detailPanel
             dividerWidth = 3
         }
+        splitter = s
         add(toolbar.component, BorderLayout.NORTH)
-        add(splitter, BorderLayout.CENTER)
+        add(s, BorderLayout.CENTER)
         revalidate(); repaint()
+
+        addComponentListener(object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent) {
+                updateSplitterOrientation()
+            }
+        })
+        updateSplitterOrientation()
+    }
+
+    private fun updateSplitterOrientation() {
+        val s = splitter ?: return
+        val isVertical = width < 500
+        if (s.isVertical != isVertical) {
+            s.orientation = isVertical
+            s.proportion = if (isVertical) 0.50f else 0.40f
+        }
     }
 
     private fun buildToolbar(): ActionToolbar {
