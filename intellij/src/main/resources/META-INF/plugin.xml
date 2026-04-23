@@ -3,7 +3,7 @@
     <name>jjuicy</name>
     <vendor>jjuicy</vendor>
     <description><![CDATA[
-        Jujutsu VCS GUI embedded as a sidebar tool window.
+        Native Jujutsu VCS GUI embedded as a sidebar tool window.
         Requires the <code>jjuicy</code> (or <code>gg</code>) binary to be available on PATH,
         or configured in Settings → Tools → jjuicy.
     ]]></description>
@@ -21,6 +21,9 @@
         <projectService
             serviceImplementation="com.jjuicy.intellij.GGProcessManager"/>
 
+        <projectService
+            serviceImplementation="com.jjuicy.intellij.data.GGRepository"/>
+
         <applicationService
             serviceImplementation="com.jjuicy.intellij.GGSettings"/>
 
@@ -37,4 +40,26 @@
         <postStartupActivity
             implementation="com.jjuicy.intellij.GGStartupActivity"/>
     </extensions>
+
+    <actions>
+        <group id="GG.Toolbar" text="jjuicy Toolbar" popup="false">
+            <action id="GG.Refresh"
+                    class="com.jjuicy.intellij.actions.GGRefreshAction"
+                    text="Refresh"
+                    description="Reload the commit log"/>
+            <action id="GG.Undo"
+                    class="com.jjuicy.intellij.actions.GGUndoAction"
+                    text="Undo"
+                    description="Undo the last jj operation"/>
+            <separator/>
+            <action id="GG.Push"
+                    class="com.jjuicy.intellij.actions.GGPushAction"
+                    text="Push"
+                    description="Push bookmarks to remote"/>
+            <action id="GG.Fetch"
+                    class="com.jjuicy.intellij.actions.GGFetchAction"
+                    text="Fetch"
+                    description="Fetch from remote"/>
+        </group>
+    </actions>
 </idea-plugin>

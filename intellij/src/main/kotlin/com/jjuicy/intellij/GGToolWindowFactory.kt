@@ -8,34 +8,31 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
+import com.jjuicy.intellij.ui.GGMainPanel
 
 private val LOG = logger<GGToolWindowFactory>()
 
 /**
- * Creates the jjuicy sidebar tool window content.
+ * Creates the jjuicy sidebar tool window with a completely native Swing UI.
  *
- * The tool window is only applicable when the project contains a Jujutsu
- * workspace (.jj/ directory).
+ * The tool window is only shown for projects that contain a Jujutsu workspace.
  */
 class GGToolWindowFactory : ToolWindowFactory, DumbAware {
 
-    override fun shouldBeAvailable(project: Project): Boolean {
-        return GGWorkspaceDetector.hasJjWorkspace(project)
-    }
+    override fun shouldBeAvailable(project: Project): Boolean =
+        GGWorkspaceDetector.hasJjWorkspace(project)
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        LOG.info("Creating jjuicy tool window for project ${project.name}")
+        LOG.info("Creating jjuicy native tool window for project ${project.name}")
 
         val processManager = GGProcessManager.getInstance(project)
 
-        // create a disposable scoped to this tool window
-        val panelDisposable = Disposer.newDisposable("jjuicy-browser-panel")
+        val panelDisposable = Disposer.newDisposable("jjuicy-main-panel")
         Disposer.register(toolWindow.disposable, panelDisposable)
 
-        val panel = GGBrowserPanel(project, processManager, panelDisposable)
+        val panel = GGMainPanel(project, processManager, panelDisposable)
 
-        val content = ContentFactory.getInstance()
-            .createContent(panel, null, false)
+        val content = ContentFactory.getInstance().createContent(panel, null, false)
         content.setDisposer(Disposable {
             panel.dispose()
             Disposer.dispose(panelDisposable)
