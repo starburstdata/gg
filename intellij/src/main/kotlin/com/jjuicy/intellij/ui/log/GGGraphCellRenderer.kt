@@ -152,6 +152,8 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
                 if (selected) UIManager.getColor("Table.selectionForeground")!! else color,
                 1
             )
+            // tag local bookmarks so drag-and-drop hit testing can identify them
+            if (ref is StoreRef.LocalBookmark) lbl.putClientProperty("gg.ref", ref)
             return lbl
         }
 

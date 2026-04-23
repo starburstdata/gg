@@ -9,10 +9,13 @@ import com.intellij.ui.table.JBTable
 import com.intellij.util.messages.Topic
 import com.intellij.util.ui.JBUI
 import com.jjuicy.intellij.data.*
+import java.awt.Cursor
 import java.awt.BorderLayout
+import java.awt.Point
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
+import javax.swing.SwingUtilities
 import javax.swing.event.ListSelectionEvent
 
 private val LOG = logger<GGLogPanel>()
@@ -50,6 +53,10 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
     private var isLoadingMore = false
     private lateinit var revsetField: JTextField
 
+    // bookmark drag state
+    private var dragRef: StoreRef.LocalBookmark? = null
+    private var dragSourceRow: Int = -1
+
     init {
         add(buildHeaderPanel(), BorderLayout.NORTH)
         add(scrollPane, BorderLayout.CENTER)
@@ -74,17 +81,51 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
         }
 
-        // Double-click to edit; right-click for context menu
-        table.addMouseListener(object : MouseAdapter() {
+        // Double-click to edit; right-click for context menu; drag chips to move bookmarks
+        val mouseHandler = object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount == 2) {
                     val row = table.rowAtPoint(e.point)
                     if (row >= 0) editRevision(tableModel.getEnhancedRow(row).row.revision)
                 }
             }
-            override fun mousePressed(e: MouseEvent) { if (e.isPopupTrigger) showContextMenu(e) }
-            override fun mouseReleased(e: MouseEvent) { if (e.isPopupTrigger) showContextMenu(e) }
-        })
+            override fun mousePressed(e: MouseEvent) {
+                val hit = localBookmarkAtPoint(e.point)
+                if (hit != null && !e.isPopupTrigger) {
+                    dragRef = hit.second
+                    dragSourceRow = hit.first
+                    table.cursor = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)
+                    return
+                }
+                if (e.isPopupTrigger) showContextMenu(e)
+            }
+            override fun mouseReleased(e: MouseEvent) {
+                val ref = dragRef
+                if (ref != null) {
+                    val targetRow = table.rowAtPoint(e.point)
+                    if (targetRow >= 0 && targetRow != dragSourceRow) {
+                        val targetHeader = tableModel.getEnhancedRow(targetRow).row.revision
+                        runMutation("Move bookmark ${ref.bookmark_name}") {
+                            GGRepository.getInstance(project).mutate("move_ref", MoveRef(ref = ref, to_id = targetHeader.id))
+                        }
+                    }
+                    dragRef = null
+                    dragSourceRow = -1
+                    table.cursor = Cursor.getDefaultCursor()
+                    return
+                }
+                if (e.isPopupTrigger) showContextMenu(e)
+            }
+            override fun mouseDragged(e: MouseEvent) {
+                if (dragRef == null) return
+                val targetRow = table.rowAtPoint(e.point)
+                if (targetRow >= 0 && targetRow != dragSourceRow) {
+                    table.selectionModel.setSelectionInterval(targetRow, targetRow)
+                }
+            }
+        }
+        table.addMouseListener(mouseHandler)
+        table.addMouseMotionListener(mouseHandler)
     }
 
     private fun buildHeaderPanel(): JPanel {
@@ -176,7 +217,30 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         return viewRect.y + viewRect.height >= viewSize.height - GGGraphPainter.ROW_HEIGHT
     }
 
-    // --- Context menu & double-click actions ---
+    // --- Context menu, double-click, and drag actions ---
+
+    private fun localBookmarkAtPoint(p: Point): Pair<Int, StoreRef.LocalBookmark>? {
+        val row = table.rowAtPoint(p)
+        if (row < 0) return null
+        val cellRect = table.getCellRect(row, 0, false)
+        val cellPoint = Point(p.x - cellRect.x, p.y - cellRect.y)
+        // prepareRenderer returns a shared stamp component whose children have no bounds set
+        // unless we force a layout pass matching the cell's actual dimensions.
+        val cellComp = table.prepareRenderer(table.getCellRenderer(row, 0), row, 0)
+        cellComp.setSize(cellRect.width, cellRect.height)
+        forceLayout(cellComp)
+        val hit = SwingUtilities.getDeepestComponentAt(cellComp, cellPoint.x, cellPoint.y)
+        val ref = (hit as? JLabel)?.getClientProperty("gg.ref") as? StoreRef.LocalBookmark
+        return if (ref != null) Pair(row, ref) else null
+    }
+
+    /** Recursively calls doLayout() — needed for off-screen renderer components where validate() is a no-op. */
+    private fun forceLayout(c: java.awt.Component) {
+        if (c is java.awt.Container) {
+            c.doLayout()
+            for (child in c.components) forceLayout(child)
+        }
+    }
 
     private fun editRevision(header: RevHeader) {
         if (header.is_working_copy || header.is_immutable) return
