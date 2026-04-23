@@ -8,6 +8,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.messages.Topic
 import com.intellij.util.ui.JBUI
+import com.jjuicy.intellij.actions.performMutation
 import com.jjuicy.intellij.data.*
 import java.awt.Cursor
 import java.awt.BorderLayout
@@ -97,7 +98,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                     table.cursor = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)
                     return
                 }
-                if (e.isPopupTrigger) showContextMenu(e)
+                if (e.isPopupTrigger) showContextMenu(e, hit?.second)
             }
             override fun mouseReleased(e: MouseEvent) {
                 val ref = dragRef
@@ -114,7 +115,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                     table.cursor = Cursor.getDefaultCursor()
                     return
                 }
-                if (e.isPopupTrigger) showContextMenu(e)
+                if (e.isPopupTrigger) showContextMenu(e, localBookmarkAtPoint(e.point)?.second)
             }
             override fun mouseDragged(e: MouseEvent) {
                 if (dragRef == null) return
@@ -249,7 +250,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
     }
 
-    private fun showContextMenu(e: MouseEvent) {
+    private fun showContextMenu(e: MouseEvent, clickedBookmark: StoreRef.LocalBookmark? = null) {
         val row = table.rowAtPoint(e.point)
         if (row < 0) return
         table.selectionModel.setSelectionInterval(row, row)
@@ -317,6 +318,49 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
         })
+
+        if (clickedBookmark != null) {
+            menu.add(JMenuItem("Push Bookmark '${clickedBookmark.bookmark_name}'…").apply {
+                addActionListener {
+                    ApplicationManager.getApplication().executeOnPooledThread {
+                        try {
+                            val remotes = GGRepository.getInstance(project).loadRemotes()
+                            val remote = when {
+                                remotes.isEmpty() -> {
+                                    var name: String? = null
+                                    ApplicationManager.getApplication().invokeAndWait {
+                                        name = Messages.showInputDialog(project, "Remote name:", "Push Bookmark", null)
+                                    }
+                                    name ?: return@executeOnPooledThread
+                                }
+                                remotes.size == 1 -> remotes[0]
+                                else -> {
+                                    var chosen: String? = null
+                                    ApplicationManager.getApplication().invokeAndWait {
+                                        chosen = Messages.showEditableChooseDialog(
+                                            "Select remote to push to:", "Push Bookmark",
+                                            null, remotes.toTypedArray(), remotes[0], null
+                                        )
+                                    }
+                                    chosen ?: return@executeOnPooledThread
+                                }
+                            }
+                            performMutation(project, "jj git push", "git_push") {
+                                GitPush(refspec = GitRefspec.RemoteBookmark(
+                                    remote_name = remote,
+                                    bookmark_ref = clickedBookmark,
+                                ))
+                            }
+                        } catch (e: Exception) {
+                            LOG.warn("Push bookmark failed", e)
+                            ApplicationManager.getApplication().invokeLater {
+                                Messages.showErrorDialog(project, e.message ?: "Unknown error", "jjuicy")
+                            }
+                        }
+                    }
+                }
+            })
+        }
 
         menu.addSeparator()
 

@@ -12,6 +12,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.jjuicy.intellij.data.*
+import kotlinx.serialization.serializer
 
 private val LOG = logger<GGUndoAction>()
 
@@ -19,19 +20,20 @@ private val LOG = logger<GGUndoAction>()
  * Shared helper to run a mutation on a background thread, handle InputRequired
  * dialogs, and broadcast a refresh on success.
  */
-private fun performMutation(
+internal inline fun <reified T> performMutation(
     project: Project,
     taskTitle: String,
     command: String,
     options: MutationOptions = MutationOptions(),
-    buildMutation: () -> Any,
+    crossinline buildMutation: () -> T,
 ) {
+    val mutationSerializer = serializer<T>()
     object : Task.Backgroundable(project, taskTitle) {
         override fun run(indicator: ProgressIndicator) {
             try {
                 val repo = GGRepository.getInstance(project)
-                var mutation = buildMutation()
-                var result = repo.mutate(command, mutation, options)
+                val mutation = buildMutation()
+                val result = repo.client!!.mutate(command, mutation, mutationSerializer, options)
 
                 // Handle credential / multi-step input (e.g. git push with username/password).
                 // We collect the field values and let the caller inject them — but since the
