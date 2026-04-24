@@ -69,6 +69,22 @@ class GGLogTableModel : AbstractTableModel() {
     fun getRowOffset(index: Int): Int =
         if (index in rowOffsets.indices) rowOffsets[index] else index * BASE_ROW_HEIGHT
 
+    /** Update a single row's height (e.g. after word-wrapping) and recompute offsets. */
+    fun updateRowHeight(index: Int, height: Int) {
+        if (index !in rowHeights.indices) return
+        if (rowHeights[index] == height) return
+        rowHeights[index] = height
+        recomputeOffsets()
+    }
+
+    private fun recomputeOffsets() {
+        var cumulative = 0
+        for (i in rowHeights.indices) {
+            rowOffsets[i] = cumulative
+            cumulative += rowHeights[i]
+        }
+    }
+
     // --- Data access ---
 
     fun getEnhancedRow(index: Int): EnhancedLogRow = rows[index]

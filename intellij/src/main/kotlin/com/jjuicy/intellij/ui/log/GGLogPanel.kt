@@ -68,6 +68,18 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         add(buildHeaderPanel(), BorderLayout.NORTH)
         add(scrollPane, BorderLayout.CENTER)
 
+        // recompute wrapping when table width changes
+        var lastKnownWidth = 0
+        table.addComponentListener(object : java.awt.event.ComponentAdapter() {
+            override fun componentResized(e: java.awt.event.ComponentEvent) {
+                val newWidth = table.width
+                if (newWidth != lastKnownWidth && newWidth > 0 && tableModel.rowCount > 0) {
+                    lastKnownWidth = newWidth
+                    recomputeRowHeights()
+                }
+            }
+        })
+
         // Selection → publish to message bus
         table.selectionModel.addListSelectionListener { e: ListSelectionEvent ->
             if (!e.valueIsAdjusting) {
@@ -172,7 +184,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val page = repo.loadLog(currentRevset)
                 ApplicationManager.getApplication().invokeLater {
                     tableModel.setPage(page)
-                    applyRowHeights()
+                    recomputeRowHeights()
                     if (reselectId != null) {
                         reselectRevision(reselectId)
                     } else if (tableModel.rowCount > 0) {
@@ -183,16 +195,47 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 LOG.warn("Failed to load log", e)
                 ApplicationManager.getApplication().invokeLater {
                     tableModel.appendPage(LogPage(emptyList(), false))
-                    applyRowHeights()
+                    recomputeRowHeights()
                 }
             }
         }
     }
 
-    /** Set per-row heights on the JBTable from the model's computed metrics. */
-    private fun applyRowHeights() {
+    /**
+     * Compute row heights based on word-wrapped description text,
+     * then apply them to both the model and the JBTable.
+     */
+    private fun recomputeRowHeights() {
+        val tableWidth = table.width
+        val fm = table.getFontMetrics(table.font)
+        val lineHeight = fm.height
+
         for (i in 0 until tableModel.rowCount) {
-            table.setRowHeight(i, tableModel.getRowHeight(i))
+            val row = tableModel.getEnhancedRow(i)
+            val header = row.row.revision
+            val graphWidth = GGGraphPainter.graphWidth(row.row.location.col)
+            val availableWidth = if (tableWidth > 0) tableWidth - graphWidth - 12 else 400
+
+            val descText = header.description.text.ifBlank { "(no description)" }
+            val changeIdText = header.id.change.prefix + header.id.change.rest + "  "
+            val changeIdWidth = fm.stringWidth(changeIdText)
+            // rough estimate of bookmark chip width
+            val bookmarkWidth = header.refs.sumOf { ref ->
+                val name = when (ref) {
+                    is StoreRef.LocalBookmark -> ref.bookmark_name
+                    is StoreRef.RemoteBookmark -> "${ref.bookmark_name}@${ref.remote_name}"
+                    is StoreRef.Tag -> ref.tag_name
+                }
+                fm.stringWidth(" $name ") + 10
+            }
+            val firstLineAvail = maxOf(50, availableWidth - changeIdWidth - bookmarkWidth)
+            val fullLineAvail = maxOf(50, availableWidth)
+
+            val wrappedLines = GGGraphCellRenderer.wrapText(descText, fm, firstLineAvail, fullLineAvail)
+            val height = GGLogTableModel.BASE_ROW_HEIGHT + maxOf(0, wrappedLines.size - 1) * lineHeight
+
+            tableModel.updateRowHeight(i, height)
+            table.setRowHeight(i, height)
         }
     }
 

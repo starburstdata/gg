@@ -17,6 +17,50 @@ import javax.swing.table.TableCellRenderer
  */
 class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRenderer {
 
+    companion object {
+        /** Word-wrap [text] respecting explicit newlines and pixel widths. */
+        fun wrapText(text: String, fm: FontMetrics, firstLineMax: Int, fullMax: Int): List<String> {
+            val result = mutableListOf<String>()
+            for (paragraph in text.lines()) {
+                if (paragraph.isEmpty()) {
+                    result.add("")
+                    continue
+                }
+                val maxWidth = if (result.isEmpty()) firstLineMax else fullMax
+                if (fm.stringWidth(paragraph) <= maxWidth) {
+                    result.add(paragraph)
+                    continue
+                }
+                wrapParagraph(paragraph, fm, if (result.isEmpty()) firstLineMax else fullMax, fullMax, result)
+            }
+            return result.ifEmpty { listOf("") }
+        }
+
+        private fun wrapParagraph(
+            text: String,
+            fm: FontMetrics,
+            firstSegmentMax: Int,
+            otherSegmentMax: Int,
+            result: MutableList<String>,
+        ) {
+            val words = text.split(" ")
+            var current = StringBuilder()
+            var isFirst = result.isEmpty()
+            for (word in words) {
+                val maxW = if (isFirst) firstSegmentMax else otherSegmentMax
+                val test = if (current.isEmpty()) word else "$current $word"
+                if (fm.stringWidth(test) > maxW && current.isNotEmpty()) {
+                    result.add(current.toString())
+                    current = StringBuilder(word)
+                    isFirst = false
+                } else {
+                    current = StringBuilder(test)
+                }
+            }
+            if (current.isNotEmpty()) result.add(current.toString())
+        }
+    }
+
     private val cell = CellPanel()
 
     override fun getTableCellRendererComponent(
@@ -29,11 +73,15 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
     ): Component {
         val enhanced = value as? EnhancedLogRow ?: return cell
         cell.prepare(enhanced, row, isSelected, model.maxGraphColumn)
-        // Renderer is a rubber stamp — Swing won't auto-layout dynamic children
-        // (bookmarkPanel chips change per row). Use the actual cell rect so FlowLayout
-        // doesn't wrap chips to a second line when table.width hasn't settled yet.
+
         val cellRect = table.getCellRect(row, column, false)
         cell.setSize(cellRect.width, cellRect.height)
+
+        // compute word wrapping for display (heights are set externally by GGLogPanel)
+        val graphWidth = GGGraphPainter.graphWidth(enhanced.row.location.col)
+        val textWidth = cellRect.width - graphWidth - 12
+        cell.updateWrapping(textWidth)
+
         forceLayout(cell)
         return cell
     }
@@ -75,6 +123,10 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
 
             textPanel.update(enhanced, selected)
         }
+
+        fun updateWrapping(textWidth: Int) {
+            textPanel.updateWrapping(textWidth)
+        }
     }
 
     /** Paints the graph lines and node using [GGGraphPainter]. */
@@ -107,6 +159,11 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
         private val topRow = buildTopRow()
         private val extraDescLabels = mutableListOf<SimpleColoredComponent>()
 
+        // stored during update(), used during updateWrapping()
+        private var storedDescLines: List<String> = emptyList()
+        private var storedDescAttr: SimpleTextAttributes = SimpleTextAttributes.SIMPLE_CELL_ATTRIBUTES
+        private var storedHasConflict = false
+
         init {
             isOpaque = true
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -124,10 +181,15 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
             return row
         }
 
+        /**
+         * Set up change ID, bookmarks, and metadata. Description text is stored
+         * but not rendered yet — [updateWrapping] handles that once the width is known.
+         */
         fun update(enhanced: EnhancedLogRow, selected: Boolean) {
             val header = enhanced.row.revision
             val hiddenForks = enhanced.row.hidden_forks
 
+            // change ID only (description appended later in updateWrapping)
             descLabel.clear()
             val changeId = header.id.change
             if (!selected) {
@@ -137,17 +199,15 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
                 descLabel.append(changeId.prefix + changeId.rest, SimpleTextAttributes.SELECTED_SIMPLE_CELL_ATTRIBUTES)
             }
             descLabel.append("  ", SimpleTextAttributes.SIMPLE_CELL_ATTRIBUTES)
-            val descText = header.description.firstLine.ifBlank { "(no description)" }
-            val descAttr = when {
+
+            storedDescLines = header.description.lines
+            storedDescAttr = when {
                 selected -> SimpleTextAttributes.SELECTED_SIMPLE_CELL_ATTRIBUTES
                 header.is_working_copy -> SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, null)
                 header.is_immutable -> SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor.GRAY)
                 else -> SimpleTextAttributes.SIMPLE_CELL_ATTRIBUTES
             }
-            descLabel.append(descText, descAttr)
-            if (header.has_conflict) {
-                descLabel.append("  ⚠", SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, JBColor.RED))
-            }
+            storedHasConflict = header.has_conflict
 
             bookmarkPanel.removeAll()
             for (ref in header.refs) {
@@ -157,23 +217,9 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
                 bookmarkPanel.add(makeHiddenForkChip(fork, selected))
             }
 
-            // remove previous extra description lines
-            for (label in extraDescLabels) {
-                remove(label)
-            }
+            // clear previous extra lines
+            for (label in extraDescLabels) remove(label)
             extraDescLabels.clear()
-
-            // add additional description lines (lines 2+)
-            val descLines = header.description.lines
-            if (descLines.size > 1) {
-                val insertIdx = getComponentIndex(metaLabel)
-                for (i in 1 until descLines.size) {
-                    val lineLabel = SimpleColoredComponent()
-                    lineLabel.append(descLines[i], descAttr)
-                    extraDescLabels.add(lineLabel)
-                    add(lineLabel, insertIdx + (i - 1))
-                }
-            }
 
             metaLabel.clear()
             val ts = formatTimestamp(header.author.timestamp)
@@ -181,6 +227,44 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
                 "${header.author.name}  $ts",
                 SimpleTextAttributes(SimpleTextAttributes.STYLE_SMALLER, JBColor.GRAY)
             )
+        }
+
+        /**
+         * Compute word wrapping for the description and add continuation lines.
+         * Heights are set externally — this is purely for display.
+         */
+        fun updateWrapping(availableWidth: Int) {
+            // clear previous extra lines (may have been set by a prior wrapping pass)
+            for (label in extraDescLabels) remove(label)
+            extraDescLabels.clear()
+
+            val fm = getFontMetrics(font)
+
+            // width consumed by the change ID prefix already in descLabel
+            val changeIdWidth = descLabel.preferredSize.width
+            val bookmarkWidth = if (bookmarkPanel.componentCount > 0) bookmarkPanel.preferredSize.width + 8 else 0
+            val firstLineAvail = maxOf(50, availableWidth - changeIdWidth - bookmarkWidth)
+            val fullLineAvail = maxOf(50, availableWidth)
+
+            val descText = storedDescLines.joinToString("\n").ifBlank { "(no description)" }
+            val allWrappedLines = wrapText(descText, fm, firstLineAvail, fullLineAvail)
+
+            // first wrapped line goes into descLabel alongside change ID
+            descLabel.append(allWrappedLines.first(), storedDescAttr)
+            if (storedHasConflict) {
+                descLabel.append("  ⚠", SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, JBColor.RED))
+            }
+
+            // continuation lines
+            if (allWrappedLines.size > 1) {
+                val insertIdx = getComponentIndex(metaLabel)
+                for (i in 1 until allWrappedLines.size) {
+                    val lineLabel = SimpleColoredComponent()
+                    lineLabel.append(allWrappedLines[i], storedDescAttr)
+                    extraDescLabels.add(lineLabel)
+                    add(lineLabel, insertIdx + (i - 1))
+                }
+            }
         }
 
         private fun getComponentIndex(comp: java.awt.Component): Int {
