@@ -25,6 +25,7 @@ object GGGraphPainter {
     const val ROW_HEIGHT = 30
     const val HALF_COL = 9      // COLUMN_WIDTH / 2
     const val NODE_RADIUS = 5
+    const val MAX_VISIBLE_COLUMNS = 6
     private const val ARC_RADIUS = 6f
 
     // Colours matching the Svelte CSS variable palette (Catppuccin-blue ≈ #89b4fa)

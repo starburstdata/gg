@@ -23,9 +23,11 @@ val GG_LOG_CHANGED: Topic<GGRepository.LogListener> =
 // jj log template — pipe-separated fields, one commit per line.
 // Fields: changeRef|commitHex|commitShort|descFirstLine|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|bookmarkNames(csv)|remoteBookmarkTokens(csv)
 // remoteBookmarkTokens format: "name@remote" (e.g. "main@origin")
-// changeRef = change_id.short(12): long enough to be unambiguous; used as jj revision specifier.
+// changeRef = "prefix[rest]" from change_id.shortest(12): prefix is the unique shortest prefix,
+//   rest is the remainder to reach 12 chars. Brackets delimit the split; safe because change IDs
+//   use only a-z. changePrefix+changeRest is used as the jj revision specifier.
 // NOTE: descriptions whose first line contains '|' will corrupt parsing (accepted trade-off).
-private const val LOG_TEMPLATE = """change_id.short(12) ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", bookmarks.map(|b| b.name())) ++ "|" ++ separate(",", remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote())) ++ "\n""""
+private const val LOG_TEMPLATE = """change_id.shortest(12).prefix() ++ "[" ++ change_id.shortest(12).rest() ++ "]" ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", bookmarks.map(|b| b.name())) ++ "|" ++ separate(",", remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote())) ++ "\n""""
 
 /**
  * Project-scoped data façade that speaks directly to the `jj` CLI.
@@ -260,7 +262,18 @@ class GGRepository(private val project: Project) : Disposable {
         val parts = line.split("|")
         if (parts.size < 13) return null
         return try {
-            val changeRef = parts[0]      // change_id.short(12) — used as jj revision specifier
+            val rawChange = parts[0]      // "prefix[rest]" from change_id.shortest(12)
+            val bracketIdx = rawChange.indexOf('[')
+            val changePrefix: String
+            val changeRest: String
+            if (bracketIdx >= 0) {
+                changePrefix = rawChange.substring(0, bracketIdx)
+                changeRest = rawChange.substring(bracketIdx + 1, rawChange.length - 1)
+            } else {
+                changePrefix = rawChange
+                changeRest = ""
+            }
+            val changeRef = changePrefix + changeRest  // full 12-char form for jj revision specifier
             val commitHex = parts[1]      // commit_id.short(64) — full hex
             val commitShort = parts[2]    // commit_id.short()
             val descFirstLine = parts[3]
@@ -299,7 +312,7 @@ class GGRepository(private val project: Project) : Disposable {
 
             RevHeader(
                 id = RevId(
-                    change = ChangeId(hex = changeRef, prefix = changeRef, rest = ""),
+                    change = ChangeId(hex = changeRef, prefix = changePrefix, rest = changeRest),
                     commit = CommitId(hex = commitHex, prefix = commitShort, rest = commitHex.drop(commitShort.length)),
                 ),
                 description = MultilineString(listOf(descFirstLine)),

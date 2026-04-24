@@ -67,7 +67,7 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
 
             graphPanel.enhanced = enhanced
             graphPanel.rowIndex = rowIndex
-            val gw = GGGraphPainter.graphWidth(maxCol)
+            val gw = GGGraphPainter.graphWidth(minOf(maxCol, GGGraphPainter.MAX_VISIBLE_COLUMNS))
             graphPanel.preferredSize = Dimension(gw, GGGraphPainter.ROW_HEIGHT)
 
             textPanel.update(enhanced, selected)
@@ -92,6 +92,9 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
 
     /** Right-side text area: description + bookmarks + author. */
     private class TextPanel : JPanel() {
+
+        private val changeIdPrefixColor = JBColor(Color(0xCA_5C_2C), Color(0xD1_75_5B))
+        private val changeIdRestColor = JBColor(Color(0x80_80_80), Color(0x79_79_79))
 
         private val descLabel = SimpleColoredComponent()
         private val metaLabel = SimpleColoredComponent()
@@ -119,6 +122,14 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
             val hiddenForks = enhanced.row.hidden_forks
 
             descLabel.clear()
+            val changeId = header.id.change
+            if (!selected) {
+                descLabel.append(changeId.prefix, SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, changeIdPrefixColor))
+                descLabel.append(changeId.rest, SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, changeIdRestColor))
+            } else {
+                descLabel.append(changeId.prefix + changeId.rest, SimpleTextAttributes.SELECTED_SIMPLE_CELL_ATTRIBUTES)
+            }
+            descLabel.append("  ", SimpleTextAttributes.SIMPLE_CELL_ATTRIBUTES)
             val descText = header.description.firstLine.ifBlank { "(no description)" }
             val descAttr = when {
                 selected -> SimpleTextAttributes.SELECTED_SIMPLE_CELL_ATTRIBUTES
