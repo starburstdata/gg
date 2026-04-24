@@ -21,9 +21,10 @@ val GG_LOG_CHANGED: Topic<GGRepository.LogListener> =
     Topic.create("GG Log Changed", GGRepository.LogListener::class.java)
 
 // jj log template — pipe-separated fields, one commit per line.
-// Fields: changeHex|changeShort|commitHex|commitShort|descFirstLine|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|bookmarkNames(csv)
+// Fields: changeRef|commitHex|commitShort|descFirstLine|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|bookmarkNames(csv)
+// changeRef = change_id.short(12): long enough to be unambiguous; used as jj revision specifier.
 // NOTE: descriptions whose first line contains '|' will corrupt parsing (accepted trade-off).
-private const val LOG_TEMPLATE = """change_id.hex() ++ "|" ++ change_id.short() ++ "|" ++ commit_id.hex() ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().hex()).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", bookmarks.map(|b| b.name())) ++ "\n""""
+private const val LOG_TEMPLATE = """change_id.short(12) ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", bookmarks.map(|b| b.name())) ++ "\n""""
 
 /**
  * Project-scoped data façade that speaks directly to the `jj` CLI.
@@ -256,25 +257,24 @@ class GGRepository(private val project: Project) : Disposable {
 
     private fun parseLogLine(line: String): RevHeader? {
         val parts = line.split("|")
-        if (parts.size < 13) return null
+        if (parts.size < 12) return null
         return try {
-            val changeHex = parts[0]
-            val changeShort = parts[1]
-            val commitHex = parts[2]
-            val commitShort = parts[3]
-            val descFirstLine = parts[4]
-            val authorName = parts[5]
-            val authorEmail = parts[6]
-            val timestamp = parts[7]
-            val parentHexes = parts[8].split(",").filter { it.isNotBlank() }
-            val isWC = parts[9] == "1"
-            val isImmutable = parts[10] == "1"
-            val hasConflict = parts[11] == "1"
-            val bookmarkNames = parts[12].split(",").filter { it.isNotBlank() }
+            val changeRef = parts[0]      // change_id.short(12) — used as jj revision specifier
+            val commitHex = parts[1]      // commit_id.hex()
+            val commitShort = parts[2]    // commit_id.short()
+            val descFirstLine = parts[3]
+            val authorName = parts[4]
+            val authorEmail = parts[5]
+            val timestamp = parts[6]
+            val parentHexes = parts[7].split(",").filter { it.isNotBlank() }
+            val isWC = parts[8] == "1"
+            val isImmutable = parts[9] == "1"
+            val hasConflict = parts[10] == "1"
+            val bookmarkNames = parts[11].split(",").filter { it.isNotBlank() }
 
             RevHeader(
                 id = RevId(
-                    change = ChangeId(hex = changeHex, prefix = changeShort, rest = changeHex.drop(changeShort.length)),
+                    change = ChangeId(hex = changeRef, prefix = changeRef, rest = ""),
                     commit = CommitId(hex = commitHex, prefix = commitShort, rest = commitHex.drop(commitShort.length)),
                 ),
                 description = MultilineString(listOf(descFirstLine)),
