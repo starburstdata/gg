@@ -201,9 +201,9 @@ class GGRepository(private val project: Project) : Disposable {
     fun loadRemotes(): List<String> {
         val result = runner.run("git", "remote", "list")
         if (result.exitCode != 0) return emptyList()
+        // Each line is "<name> <url>" — take only the first token (the name).
         return result.stdout.lines()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
+            .mapNotNull { it.trim().split(Regex("\\s+")).firstOrNull()?.takeIf { n -> n.isNotEmpty() } }
     }
 
     // --- Mutations ---

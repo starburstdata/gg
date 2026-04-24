@@ -29,6 +29,10 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
     ): Component {
         val enhanced = value as? EnhancedLogRow ?: return cell
         cell.prepare(enhanced, row, isSelected, model.maxGraphColumn)
+        // Renderer is a rubber stamp — Swing won't auto-layout dynamic children
+        // (bookmarkPanel chips change per row). Force a full validate pass now so
+        // chips have non-zero bounds before the cell is painted.
+        cell.validate()
         return cell
     }
 
