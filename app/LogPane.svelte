@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from "svelte";
     import type { LogPage } from "./messages/LogPage.js";
     import type { LogRow } from "./messages/LogRow.js";
     import type { RevHeader } from "./messages/RevHeader";
@@ -92,12 +91,8 @@
             }
 
             // translate from toplogical from::to to listwidget's anchor::extension
-            const revSetFromIdx = graphRows.findIndex(
-                (row) => row.revision.id.commit.hex === $revisionSelectEvent!.from.commit.hex,
-            );
-            const revSetToIdx = graphRows.findIndex(
-                (row) => row.revision.id.commit.hex === $revisionSelectEvent!.to.commit.hex,
-            );
+            const revSetFromIdx = rowIdxByHex.get($revisionSelectEvent!.from.commit.hex) ?? -1;
+            const revSetToIdx = rowIdxByHex.get($revisionSelectEvent!.to.commit.hex) ?? -1;
 
             const extensionIdx = revSetFromIdx === selectionAnchorIdx ? revSetToIdx : revSetFromIdx;
 
@@ -121,22 +116,44 @@
         },
     };
 
-    onMount(() => {
-        loadLog(true);
-    });
-
     $: choices = getChoices(entered_query, presets);
-    $: if ($repoStatusEvent) reloadLog();
 
-    function isInSelectedRange(row: EnhancedRow, selection: typeof $revisionSelectEvent): boolean {
-        if (!selection || !graphRows) return false;
-        const fromIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === selection.from.commit.hex);
-        const toIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === selection.to.commit.hex);
-        const rowIdx = graphRows.indexOf(row);
-        if (fromIdx === -1 || toIdx === -1 || rowIdx === -1) return false;
-        const minIdx = Math.min(fromIdx, toIdx);
-        const maxIdx = Math.max(fromIdx, toIdx);
-        return rowIdx >= minIdx && rowIdx <= maxIdx;
+    // dedupe repoStatusEvent — it fires multiple times during the startup handshake
+    // with identical content. first change drives the initial fast-path load; later
+    // genuine changes drive a full reload so we can relocate the previous selection.
+    let lastStatusKey: string | null = null;
+    $: if ($repoStatusEvent) {
+        let key = JSON.stringify($repoStatusEvent);
+        if (key !== lastStatusKey) {
+            let isFirst = lastStatusKey === null;
+            lastStatusKey = key;
+            loadLog(isFirst);
+        }
+    }
+
+    // index rows by commit hex so selection and per-row lookups stay O(1) as the graph grows
+    $: rowIdxByHex = (() => {
+        let map = new Map<string, number>();
+        if (graphRows) {
+            for (let i = 0; i < graphRows.length; i++) {
+                map.set(graphRows[i].revision.id.commit.hex, i);
+            }
+        }
+        return map;
+    })();
+
+    $: selectionRange = (() => {
+        if (!$revisionSelectEvent || !graphRows) return null;
+        let a = rowIdxByHex.get($revisionSelectEvent.from.commit.hex);
+        let b = rowIdxByHex.get($revisionSelectEvent.to.commit.hex);
+        if (a === undefined || b === undefined) return null;
+        return { min: Math.min(a, b), max: Math.max(a, b) };
+    })();
+
+    function isInSelectedRange(row: EnhancedRow, range: { min: number; max: number } | null): boolean {
+        if (!range) return false;
+        let idx = rowIdxByHex.get(row.revision.id.commit.hex);
+        return idx !== undefined && idx >= range.min && idx <= range.max;
     }
 
     /**
@@ -188,7 +205,7 @@
     function handleClick(header: RevHeader) {
         if (!graphRows) return;
 
-        const clickedIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === header.id.commit.hex);
+        const clickedIdx = rowIdxByHex.get(header.id.commit.hex) ?? -1;
         if (clickedIdx !== -1) {
             setSelection(clickedIdx, clickedIdx);
         }
@@ -200,7 +217,7 @@
             return;
         }
 
-        const clickedIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === header.id.commit.hex);
+        const clickedIdx = rowIdxByHex.get(header.id.commit.hex) ?? -1;
         if (clickedIdx === -1) {
             handleClick(header); // invalid selection
             return;
@@ -268,7 +285,20 @@
         reloadLog();
     }
 
+    // epoch-based cancellation: a new loadLog bumps the epoch, discarding any
+    // in-flight page from a previous call. prevents startup races where repeated
+    // repoStatusEvents would concurrently mutate graphRows and the shared
+    // graph-building state (passNextRow, lineKey) below.
+    let loadEpoch = 0;
+
     async function loadLog(selectFirst: boolean) {
+        const epoch = ++loadEpoch;
+        // passNextRow can carry stale lines from a cancelled load. lineKey must stay
+        // monotonic so reload produces fresh keys — otherwise Svelte's keyed {#each}
+        // reuses GraphLine components, whose path is computed in a non-reactive let
+        // block and won't update to the new line's geometry.
+        passNextRow = [];
+        locationIdxMap.clear();
         let page = await query<LogPage>(
             "query_log",
             {
@@ -276,26 +306,34 @@
             },
             () => (graphRows = undefined),
         );
+        if (epoch !== loadEpoch) return;
 
         if (page.type == "data") {
             graphRows = [];
             graphRows = addPageToGraph(graphRows, page.value.rows);
+            let hasMorePages = page.value.has_more;
 
+            // fast initial paint: select row 0 before loading the rest so the user sees
+            // the first page immediately. subsequent pages arrive asynchronously.
             if (selectFirst && page.value.rows.length > 0) {
                 setSelection(0, 0);
             }
 
-            while (page.value.has_more) {
+            // always drain remaining pages: a FromNode line can span page boundaries, and
+            // its passingLines on earlier rows are only populated when the target row (on a
+            // later page) is processed. stopping at page 1 leaves those lines unrendered.
+            while (hasMorePages) {
                 let next_page = await query<LogPage>("query_log_next_page", null);
+                if (epoch !== loadEpoch) return;
                 if (next_page.type == "data") {
                     graphRows = addPageToGraph(graphRows, next_page.value.rows);
-                    page = next_page;
+                    hasMorePages = next_page.value.has_more;
                 } else {
+                    hasMorePages = false;
                     break;
                 }
             }
 
-            // XXX perhaps we should retry this after each page
             if (!selectFirst) {
                 syncSelectionWithGraph();
             }
@@ -309,8 +347,8 @@
             return;
         }
 
-        let fromIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === selection.from.commit.hex);
-        let toIdx = graphRows.findIndex((r) => r.revision.id.commit.hex === selection.to.commit.hex);
+        let fromIdx = rowIdxByHex.get(selection.from.commit.hex) ?? -1;
+        let toIdx = rowIdxByHex.get(selection.to.commit.hex) ?? -1;
 
         if (fromIdx === -1) {
             fromIdx = graphRows.findIndex((r) => sameChange(r.revision.id.change, selection.from.change));
@@ -341,6 +379,10 @@
     // augment rows with all lines that pass through them
     let lineKey = 0;
     let passNextRow: EnhancedLine[] = [];
+    // map from backend location[1] (which skips slots for missing-parent terminators)
+    // to graph array index — avoids an O(N) findIndex per line as the log grows.
+    let locationIdxMap = new Map<number, number>();
+
     function addPageToGraph(graph: EnhancedRow[], page: LogRow[]): EnhancedRow[] {
         for (let row of page) {
             let enhancedRow = row as EnhancedRow;
@@ -349,6 +391,10 @@
             }
             enhancedRow.passingLines = passNextRow;
             passNextRow = [];
+
+            let rowIdx = graph.length;
+            graph.push(enhancedRow);
+            locationIdxMap.set(enhancedRow.location[1], rowIdx);
 
             for (let line of enhancedRow.lines) {
                 let enhancedLine = line as EnhancedLine;
@@ -361,20 +407,16 @@
                     passNextRow.push(enhancedLine);
                 } else {
                     // other lines end at their owning row, so we need to add them to all previous rows and then this one.
-                    // line.source[1] / line.target[1] are row numbers from the backend's coordinate
-                    // system, which skip rows for missing-parent terminators — so they don't map 1:1
-                    // to graph indices. find the source row and walk indices between source and target.
                     enhancedLine.parent = row.revision;
-                    let sourceIdx = graph.findIndex((r) => r.location[1] == line.source[1]);
+                    let sourceIdx = locationIdxMap.get(line.source[1]);
+                    if (sourceIdx === undefined) continue; // defensive: source row unknown
                     enhancedLine.child = graph[sourceIdx].revision;
-                    for (let i = sourceIdx; i < graph.length && graph[i].location[1] < line.target[1]; i++) {
+                    for (let i = sourceIdx; i < rowIdx && graph[i].location[1] < line.target[1]; i++) {
                         graph[i].passingLines.push(enhancedLine);
                     }
                     enhancedRow.passingLines.push(enhancedLine);
                 }
             }
-
-            graph.push(enhancedRow);
         }
 
         return graph;
@@ -421,7 +463,7 @@
                         <RevisionObject
                             header={row.revision}
                             hiddenForks={row.hidden_forks}
-                            selected={isInSelectedRange(row, $revisionSelectEvent)}
+                            selected={isInSelectedRange(row, selectionRange)}
                             onClick={handleClick}
                             onShiftClick={handleShiftClick} />
                     </div>
