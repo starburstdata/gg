@@ -276,9 +276,10 @@ class GGRepository(private val project: Project) : Disposable {
             val isImmutable = parts[8] == "1"
             val hasConflict = parts[9] == "1"
             val bookmarkTokens = parts[10].split(",").filter { it.isNotBlank() }
+            val remoteBookmarkTokens = parts[11].split(",").filter { it.isNotBlank() }
             val descriptionText = parts[12].trimEnd()
 
-            // bookmarks field now contains "name~remote" tokens; empty remote = local
+            // field 11 contains "name~remote" tokens; empty remote = local bookmark
             val localNames = mutableListOf<String>()
             val remoteEntries = mutableListOf<Pair<String, String>>()
             for (token in bookmarkTokens) {
@@ -293,14 +294,16 @@ class GGRepository(private val project: Project) : Disposable {
                 }
             }
 
+            // field 12 is needed for is_synced: when co-located, bookmarks only
+            // returns the local entry while remote_bookmarks has the remote refs
             val localNameSet = localNames.toSet()
-            val remoteNameSet = remoteEntries.map { it.first }.toSet()
 
             val localRefs = localNames.map { name ->
+                val isSynced = remoteBookmarkTokens.any { it.startsWith("$name@") }
                 StoreRef.LocalBookmark(
                     bookmark_name = name,
                     has_conflict = false,
-                    is_synced = name in remoteNameSet,
+                    is_synced = isSynced,
                     tracking_remotes = emptyList(),
                     available_remotes = 0,
                     potential_remotes = 0,
