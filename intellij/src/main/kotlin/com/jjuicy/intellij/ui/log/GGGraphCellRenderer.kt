@@ -67,7 +67,7 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
 
             graphPanel.enhanced = enhanced
             graphPanel.rowIndex = rowIndex
-            val gw = GGGraphPainter.graphWidth(minOf(maxCol, GGGraphPainter.MAX_VISIBLE_COLUMNS))
+            val gw = GGGraphPainter.graphWidth(enhanced.row.location.col)
             graphPanel.preferredSize = Dimension(gw, GGGraphPainter.ROW_HEIGHT)
 
             textPanel.update(enhanced, selected)
