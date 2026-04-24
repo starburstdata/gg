@@ -10,11 +10,12 @@ import java.awt.geom.Ellipse2D
  * Stateless graph renderer.
  *
  * Ports the geometry from GraphLine.svelte and GraphNode.svelte to Graphics2D.
- * All coordinates are in the full-graph absolute coordinate system where:
+ * All coordinates are in the full-graph absolute coordinate system using
+ * cumulative row offsets (variable row heights based on description line count).
  *   - column x = col * COLUMN_WIDTH + HALF_COL
- *   - row "child y" = row * ROW_HEIGHT + 21
- *   - row "parent y" = row * ROW_HEIGHT + 9
- *   - row centre y = row * ROW_HEIGHT + 15
+ *   - child connection y = rowOffset[row] + rowHeight[row] - 9
+ *   - parent connection y = rowOffset[row] + 9
+ *   - node centre y = rowOffset[row] + 15
  *
  * The caller should translate/clip the Graphics2D context to the appropriate
  * cell before invoking these methods.
@@ -22,7 +23,7 @@ import java.awt.geom.Ellipse2D
 object GGGraphPainter {
 
     const val COLUMN_WIDTH = 18
-    const val ROW_HEIGHT = 30
+    const val BASE_ROW_HEIGHT = 30
     const val HALF_COL = 9      // COLUMN_WIDTH / 2
     const val NODE_RADIUS = 5
     private const val ARC_RADIUS = 6f
@@ -44,45 +45,59 @@ object GGGraphPainter {
     /**
      * Paint all [EnhancedLogLine]s that pass through [rowIndex] onto [g].
      *
-     * [g]'s origin should already be at (0, 0) of the cell (i.e. the top-left
-     * of the 30 px row). We translate internally by -rowIndex * ROW_HEIGHT to
-     * obtain absolute graph coordinates, then set a clip for this row.
+     * [g]'s origin should already be at (0, 0) of the cell. We translate
+     * internally by the cumulative row offset to obtain absolute graph
+     * coordinates, then clip to this row's height.
      */
-    fun paintLines(g: Graphics2D, lines: List<EnhancedLogLine>, rowIndex: Int, cellWidth: Int) {
+    fun paintLines(
+        g: Graphics2D,
+        lines: List<EnhancedLogLine>,
+        rowIndex: Int,
+        cellWidth: Int,
+        rowHeights: IntArray,
+        rowOffsets: IntArray,
+    ) {
         val g2 = g.create() as Graphics2D
         try {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            // clip to the 30px cell height
-            g2.setClip(0, 0, cellWidth, ROW_HEIGHT)
-            // shift so absolute graph y=0 corresponds to the top of the entire graph
-            g2.translate(0, -rowIndex * ROW_HEIGHT)
+            val rh = rowHeight(rowIndex, rowHeights)
+            g2.setClip(0, 0, cellWidth, rh)
+            g2.translate(0, -rowOffset(rowIndex, rowOffsets))
 
             for (enhLine in lines) {
-                paintLine(g2, enhLine)
+                paintLine(g2, enhLine, rowHeights, rowOffsets)
             }
         } finally {
             g2.dispose()
         }
     }
 
-    private fun paintLine(g: Graphics2D, enhLine: EnhancedLogLine) {
+    private fun paintLine(g: Graphics2D, enhLine: EnhancedLogLine, rowHeights: IntArray, rowOffsets: IntArray) {
         val line = enhLine.line
-        val path = buildPath(line)
+        val path = buildPath(line, rowHeights, rowOffsets)
 
         g.stroke = if (line.indirect) DASHED_STROKE else SOLID_STROKE
         g.color = if (line.indirect) LINE_COLOR_INDIRECT else LINE_COLOR
         g.draw(path)
     }
 
+    private fun rowHeight(row: Int, rowHeights: IntArray): Int =
+        if (row in rowHeights.indices) rowHeights[row] else BASE_ROW_HEIGHT
+
+    private fun rowOffset(row: Int, rowOffsets: IntArray): Int =
+        if (row in rowOffsets.indices) rowOffsets[row] else row * BASE_ROW_HEIGHT
+
     /** Build the full GeneralPath for a line in absolute graph coordinates. */
-    private fun buildPath(line: LogLine): GeneralPath {
+    private fun buildPath(line: LogLine, rowHeights: IntArray, rowOffsets: IntArray): GeneralPath {
         val c1 = line.source.col
         val c2 = line.target.col
         val r1 = line.source.row
         val r2 = line.target.row
 
-        val childY = r1 * ROW_HEIGHT + 21f
-        val parentY = r2 * ROW_HEIGHT + 9f
+        // child connection point: near bottom of child row
+        val childY = rowOffset(r1, rowOffsets) + rowHeight(r1, rowHeights) - 9f
+        // parent connection point: near top of parent row
+        val parentY = rowOffset(r2, rowOffsets) + 9f
 
         return when {
             line is LogLine.ToIntersection && c1 != c2 -> {
@@ -91,7 +106,7 @@ object GGGraphPainter {
             }
             line is LogLine.FromNode && line.via != null && line.via != c1 -> {
                 // rescue sweep with three segments
-                rescuePath(c1, c2, line.via, r1, r2, childY, parentY)
+                rescuePath(c1, c2, line.via, r1, r2, childY, parentY, rowOffsets)
             }
             c1 == c2 -> {
                 // straight vertical
@@ -99,7 +114,7 @@ object GGGraphPainter {
             }
             else -> {
                 // two-segment curved line (the common case)
-                curvedPath(c1, c2, r1, r2, childY, parentY, line is LogLine.FromNode)
+                curvedPath(c1, c2, r1, r2, childY, parentY, line is LogLine.FromNode, rowOffsets)
             }
         }
     }
@@ -117,11 +132,12 @@ object GGGraphPainter {
         r1: Int, r2: Int,
         childY: Float, parentY: Float,
         isFromNode: Boolean,
+        rowOffsets: IntArray,
     ): GeneralPath {
         val childX = c1 * COLUMN_WIDTH + HALF_COL.toFloat()
         val parentX = c2 * COLUMN_WIDTH + HALF_COL.toFloat()
         // rescue FromNodes (right-to-left only) bend near the target row boundary
-        val midY = if (isFromNode && c1 > c2) r2 * ROW_HEIGHT.toFloat() else childY + 9f
+        val midY = if (isFromNode && c1 > c2) rowOffset(r2, rowOffsets).toFloat() else childY + 9f
         val radius = if (c2 > c1) ARC_RADIUS else -ARC_RADIUS
         val sweep = c2 > c1 // true = clockwise
 
@@ -156,12 +172,13 @@ object GGGraphPainter {
         c1: Int, c2: Int, via: Int,
         r1: Int, r2: Int,
         childY: Float, parentY: Float,
+        rowOffsets: IntArray,
     ): GeneralPath {
         val childX = c1 * COLUMN_WIDTH + HALF_COL.toFloat()
         val viaX = via * COLUMN_WIDTH + HALF_COL.toFloat()
         val parentX = c2 * COLUMN_WIDTH + HALF_COL.toFloat()
         val topMidY = childY + 9f
-        val botMidY = r2 * ROW_HEIGHT.toFloat()
+        val botMidY = rowOffset(r2, rowOffsets).toFloat()
         val topRadius = if (viaX > childX) ARC_RADIUS else -ARC_RADIUS
         val topSweep = viaX > childX
         val botRadius = if (parentX > viaX) ARC_RADIUS else -ARC_RADIUS
@@ -194,17 +211,18 @@ object GGGraphPainter {
 
     /**
      * Paint the commit node circle at [row]'s column, using absolute coordinates.
-     * The caller must apply the same -rowIndex * ROW_HEIGHT translation as for lines.
+     * The caller must apply the same row-offset translation as for lines.
      */
-    fun paintNode(g: Graphics2D, row: EnhancedLogRow, rowIndex: Int) {
+    fun paintNode(g: Graphics2D, row: EnhancedLogRow, rowIndex: Int, rowOffsets: IntArray) {
         val g2 = g.create() as Graphics2D
         try {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            g2.translate(0, -rowIndex * ROW_HEIGHT)
+            g2.translate(0, -rowOffset(rowIndex, rowOffsets))
 
             val col = row.row.location.col
             val cx = col * COLUMN_WIDTH + HALF_COL.toFloat()
-            val cy = row.row.location.row * ROW_HEIGHT + 15f  // centre of row
+            // 15px from top of row — aligned with the first text line
+            val cy = rowOffset(row.row.location.row, rowOffsets) + 15f
 
             val header = row.row.revision
             val diameter = NODE_RADIUS * 2f

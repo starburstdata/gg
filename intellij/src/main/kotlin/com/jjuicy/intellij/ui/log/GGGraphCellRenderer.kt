@@ -67,8 +67,11 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
 
             graphPanel.enhanced = enhanced
             graphPanel.rowIndex = rowIndex
+            graphPanel.rowHeights = model.rowHeights
+            graphPanel.rowOffsets = model.rowOffsets
             val gw = GGGraphPainter.graphWidth(enhanced.row.location.col)
-            graphPanel.preferredSize = Dimension(gw, GGGraphPainter.ROW_HEIGHT)
+            val rh = model.getRowHeight(rowIndex)
+            graphPanel.preferredSize = Dimension(gw, rh)
 
             textPanel.update(enhanced, selected)
         }
@@ -78,6 +81,8 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
     private class GraphPanel : JPanel() {
         var enhanced: EnhancedLogRow? = null
         var rowIndex: Int = 0
+        var rowHeights: IntArray = IntArray(0)
+        var rowOffsets: IntArray = IntArray(0)
 
         init { isOpaque = true }
 
@@ -85,8 +90,8 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
             super.paintComponent(g)
             val enh = enhanced ?: return
             val g2 = g as Graphics2D
-            GGGraphPainter.paintLines(g2, enh.passingLines, rowIndex, width)
-            GGGraphPainter.paintNode(g2, enh, rowIndex)
+            GGGraphPainter.paintLines(g2, enh.passingLines, rowIndex, width, rowHeights, rowOffsets)
+            GGGraphPainter.paintNode(g2, enh, rowIndex, rowOffsets)
         }
     }
 
@@ -99,12 +104,14 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
         private val descLabel = SimpleColoredComponent()
         private val metaLabel = SimpleColoredComponent()
         private val bookmarkPanel = JPanel(FlowLayout(FlowLayout.LEFT, 2, 0))
+        private val topRow = buildTopRow()
+        private val extraDescLabels = mutableListOf<SimpleColoredComponent>()
 
         init {
             isOpaque = true
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             bookmarkPanel.isOpaque = false
-            add(buildTopRow())
+            add(topRow)
             add(metaLabel)
             border = JBUI.Borders.emptyLeft(4)
         }
@@ -150,12 +157,37 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
                 bookmarkPanel.add(makeHiddenForkChip(fork, selected))
             }
 
+            // remove previous extra description lines
+            for (label in extraDescLabels) {
+                remove(label)
+            }
+            extraDescLabels.clear()
+
+            // add additional description lines (lines 2+)
+            val descLines = header.description.lines
+            if (descLines.size > 1) {
+                val insertIdx = getComponentIndex(metaLabel)
+                for (i in 1 until descLines.size) {
+                    val lineLabel = SimpleColoredComponent()
+                    lineLabel.append(descLines[i], descAttr)
+                    extraDescLabels.add(lineLabel)
+                    add(lineLabel, insertIdx + (i - 1))
+                }
+            }
+
             metaLabel.clear()
             val ts = formatTimestamp(header.author.timestamp)
             metaLabel.append(
                 "${header.author.name}  $ts",
                 SimpleTextAttributes(SimpleTextAttributes.STYLE_SMALLER, JBColor.GRAY)
             )
+        }
+
+        private fun getComponentIndex(comp: java.awt.Component): Int {
+            for (i in 0 until componentCount) {
+                if (getComponent(i) === comp) return i
+            }
+            return componentCount
         }
 
         private fun makeChip(ref: StoreRef, selected: Boolean): SimpleColoredComponent {

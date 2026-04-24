@@ -20,14 +20,13 @@ private val LOG = logger<GGRepository>()
 val GG_LOG_CHANGED: Topic<GGRepository.LogListener> =
     Topic.create("GG Log Changed", GGRepository.LogListener::class.java)
 
-// jj log template — pipe-separated fields, one commit per line.
-// Fields: changeRef|commitHex|commitShort|descFirstLine|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|bookmarkNames(csv)|remoteBookmarkTokens(csv)
+// jj log template — pipe-separated fields, \0-delimited records.
+// Description (full, multi-line) is the LAST field so pipes/newlines inside it are safe:
+//   split("|", limit=13) captures the first 12 fixed fields; everything after is description.
+// Fields: changeRef|commitHex|commitShort|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|bookmarkNames(csv)|remoteBookmarkTokens(csv)|description
+// changeRef = "prefix[rest]" from change_id.shortest(12).
 // remoteBookmarkTokens format: "name@remote" (e.g. "main@origin")
-// changeRef = "prefix[rest]" from change_id.shortest(12): prefix is the unique shortest prefix,
-//   rest is the remainder to reach 12 chars. Brackets delimit the split; safe because change IDs
-//   use only a-z. changePrefix+changeRest is used as the jj revision specifier.
-// NOTE: descriptions whose first line contains '|' will corrupt parsing (accepted trade-off).
-private const val LOG_TEMPLATE = """change_id.shortest(12).prefix() ++ "[" ++ change_id.shortest(12).rest() ++ "]" ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ bookmarks.map(|b| b.name()).join(",") ++ "|" ++ remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote()).join(",") ++ "\n""""
+private const val LOG_TEMPLATE = """change_id.shortest(12).prefix() ++ "[" ++ change_id.shortest(12).rest() ++ "]" ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ bookmarks.map(|b| b.name()).join(",") ++ "|" ++ remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote()).join(",") ++ "|" ++ description ++ "\0""""
 
 /**
  * Project-scoped data façade that speaks directly to the `jj` CLI.
@@ -143,9 +142,9 @@ class GGRepository(private val project: Project) : Disposable {
             "-r", revset,
             "-T", LOG_TEMPLATE,
         )
-        val headers = output.lines()
+        val headers = output.split("\u0000")
             .filter { it.isNotBlank() }
-            .mapNotNull { parseLogLine(it) }
+            .mapNotNull { parseLogLine(it.trimStart('\n')) }
         val rows = JJGraphLayout.computeRows(headers)
         return LogPage(rows = rows, has_more = false)
     }
@@ -157,29 +156,21 @@ class GGRepository(private val project: Project) : Disposable {
      */
     fun loadRevisions(set: RevSet): RevsResult {
         val changeHex = set.from.change.hex
-        // fetch full description separately (log template only captures first_line)
-        val descOutput = runner.run("log", "-r", changeHex, "--no-graph", "--color=never", "-T", "description")
-        val fullDesc = if (descOutput.exitCode == 0) descOutput.stdout else set.from.change.hex
 
         val headerOutput = runner.run(
             "log", "--no-graph", "--color=never",
             "-r", changeHex,
             "-T", LOG_TEMPLATE,
         )
-        val header = headerOutput.stdout.lines()
+        val header = headerOutput.stdout.split("\u0000")
             .firstOrNull { it.isNotBlank() }
-            ?.let { parseLogLine(it) }
+            ?.let { parseLogLine(it.trimStart('\n')) }
             ?: return RevsResult.NotFound(set)
-
-        // patch in the full description
-        val fullHeader = header.copy(
-            description = MultilineString(fullDesc.trimEnd().lines())
-        )
 
         val changes = loadChanges(changeHex)
         return RevsResult.Detail(
             set = set,
-            headers = listOf(fullHeader),
+            headers = listOf(header),
             parents = emptyList(),
             changes = changes,
             conflicts = emptyList(),
@@ -259,7 +250,8 @@ class GGRepository(private val project: Project) : Disposable {
     // --- Parsing helpers ---
 
     private fun parseLogLine(line: String): RevHeader? {
-        val parts = line.split("|")
+        // split with limit=13: first 12 fixed fields, 13th is the full description
+        val parts = line.split("|", limit = 13)
         if (parts.size < 13) return null
         return try {
             val rawChange = parts[0]      // "prefix[rest]" from change_id.shortest(12)
@@ -276,16 +268,16 @@ class GGRepository(private val project: Project) : Disposable {
             val changeRef = changePrefix + changeRest  // full 12-char form for jj revision specifier
             val commitHex = parts[1]      // commit_id.short(64) — full hex
             val commitShort = parts[2]    // commit_id.short()
-            val descFirstLine = parts[3]
-            val authorName = parts[4]
-            val authorEmail = parts[5]
-            val timestamp = parts[6]
-            val parentHexes = parts[7].split(",").filter { it.isNotBlank() }
-            val isWC = parts[8] == "1"
-            val isImmutable = parts[9] == "1"
-            val hasConflict = parts[10] == "1"
-            val localBookmarkNames = parts[11].split(",").filter { it.isNotBlank() }
-            val remoteBookmarkTokens = parts[12].split(",").filter { it.isNotBlank() }
+            val authorName = parts[3]
+            val authorEmail = parts[4]
+            val timestamp = parts[5]
+            val parentHexes = parts[6].split(",").filter { it.isNotBlank() }
+            val isWC = parts[7] == "1"
+            val isImmutable = parts[8] == "1"
+            val hasConflict = parts[9] == "1"
+            val localBookmarkNames = parts[10].split(",").filter { it.isNotBlank() }
+            val remoteBookmarkTokens = parts[11].split(",").filter { it.isNotBlank() }
+            val descriptionText = parts[12].trimEnd()
 
             val localBookmarkNamesSet = localBookmarkNames.toSet()
             val localRefs = localBookmarkNames.map { name ->
@@ -317,12 +309,15 @@ class GGRepository(private val project: Project) : Disposable {
                 } else null
             }
 
+            val descLines = if (descriptionText.isEmpty()) listOf("")
+                else descriptionText.lines()
+
             RevHeader(
                 id = RevId(
                     change = ChangeId(hex = changeRef, prefix = changePrefix, rest = changeRest),
                     commit = CommitId(hex = commitHex, prefix = commitShort, rest = commitHex.drop(commitShort.length)),
                 ),
-                description = MultilineString(listOf(descFirstLine)),
+                description = MultilineString(descLines),
                 author = RevAuthor(email = authorEmail, name = authorName, timestamp = timestamp),
                 has_conflict = hasConflict,
                 is_working_copy = isWC,

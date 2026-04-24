@@ -4,7 +4,10 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.table.JBTable
 import com.intellij.util.messages.Topic
 import com.intellij.util.ui.JBUI
@@ -13,7 +16,10 @@ import com.jjuicy.intellij.actions.performMutation
 import com.jjuicy.intellij.data.*
 import java.awt.Cursor
 import java.awt.BorderLayout
+import java.awt.Dimension
 import java.awt.Point
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
@@ -41,7 +47,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
     val tableModel = GGLogTableModel()
     val table = JBTable(tableModel).apply {
         setDefaultRenderer(EnhancedLogRow::class.java, GGGraphCellRenderer(tableModel))
-        rowHeight = GGGraphPainter.ROW_HEIGHT
+        rowHeight = GGGraphPainter.BASE_ROW_HEIGHT
         selectionModel.selectionMode = ListSelectionModel.SINGLE_SELECTION
         tableHeader.isVisible = false
         setShowGrid(false)
@@ -75,12 +81,15 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
         }
 
-        // Double-click to edit; right-click for context menu; drag chips to move bookmarks
+        // Double-click to edit description; right-click for context menu; drag chips to move bookmarks
         val mouseHandler = object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount == 2) {
                     val row = table.rowAtPoint(e.point)
-                    if (row >= 0) editRevision(tableModel.getEnhancedRow(row).row.revision)
+                    if (row >= 0) {
+                        table.selectionModel.setSelectionInterval(row, row)
+                        editDescription()
+                    }
                 }
             }
             override fun mousePressed(e: MouseEvent) {
@@ -120,6 +129,16 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
         table.addMouseListener(mouseHandler)
         table.addMouseMotionListener(mouseHandler)
+
+        // F2 to edit description of the selected revision
+        table.addKeyListener(object : KeyAdapter() {
+            override fun keyPressed(e: KeyEvent) {
+                if (e.keyCode == KeyEvent.VK_F2) {
+                    editDescription()
+                    e.consume()
+                }
+            }
+        })
     }
 
     private fun buildHeaderPanel(): JPanel {
@@ -153,6 +172,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val page = repo.loadLog(currentRevset)
                 ApplicationManager.getApplication().invokeLater {
                     tableModel.setPage(page)
+                    applyRowHeights()
                     if (reselectId != null) {
                         reselectRevision(reselectId)
                     } else if (tableModel.rowCount > 0) {
@@ -163,8 +183,16 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 LOG.warn("Failed to load log", e)
                 ApplicationManager.getApplication().invokeLater {
                     tableModel.appendPage(LogPage(emptyList(), false))
+                    applyRowHeights()
                 }
             }
+        }
+    }
+
+    /** Set per-row heights on the JBTable from the model's computed metrics. */
+    private fun applyRowHeights() {
+        for (i in 0 until tableModel.rowCount) {
+            table.setRowHeight(i, tableModel.getRowHeight(i))
         }
     }
 
@@ -202,6 +230,50 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
     }
 
+    private fun editDescription() {
+        val row = table.selectedRow
+        if (row < 0 || row >= tableModel.rowCount) return
+        val header = tableModel.getEnhancedRow(row).row.revision
+        if (header.is_immutable) return
+
+        val textArea = JBTextArea(header.description.text).apply {
+            lineWrap = true
+            wrapStyleWord = true
+            rows = maxOf(3, header.description.lines.size + 1)
+            columns = 50
+        }
+        val scrollPane = JBScrollPane(textArea).apply {
+            preferredSize = Dimension(400, 120)
+        }
+
+        val popup = JBPopupFactory.getInstance()
+            .createComponentPopupBuilder(scrollPane, textArea)
+            .setTitle("Edit Description (Ctrl+Enter to save)")
+            .setMovable(true)
+            .setResizable(true)
+            .setRequestFocus(true)
+            .setCancelOnClickOutside(false)
+            .setCancelOnOtherWindowOpen(false)
+            .createPopup()
+
+        textArea.addKeyListener(object : KeyAdapter() {
+            override fun keyPressed(e: KeyEvent) {
+                if ((e.isControlDown || e.isMetaDown) && e.keyCode == KeyEvent.VK_ENTER) {
+                    val newDesc = textArea.text
+                    popup.cancel()
+                    runMutation("Describe revision") {
+                        GGRepository.getInstance(project).describeRevision(header.id, newDesc)
+                    }
+                    e.consume()
+                }
+            }
+        })
+
+        val cellRect = table.getCellRect(row, 0, true)
+        val relPoint = RelativePoint(table, Point(cellRect.x, cellRect.y + cellRect.height))
+        popup.show(relPoint)
+    }
+
     private fun editRevision(header: RevHeader) {
         if (header.is_working_copy || header.is_immutable) return
         runMutation("Edit revision") {
@@ -228,6 +300,11 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         menu.add(JMenuItem("Edit (Make Working Copy)").apply {
             isEnabled = !header.is_working_copy && !header.is_immutable
             addActionListener { editRevision(header) }
+        })
+
+        menu.add(JMenuItem("Edit Description…").apply {
+            isEnabled = !header.is_immutable
+            addActionListener { editDescription() }
         })
 
         menu.add(JMenuItem("Squash into Parent").apply {

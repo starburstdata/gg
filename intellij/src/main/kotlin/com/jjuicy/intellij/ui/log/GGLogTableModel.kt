@@ -37,6 +37,11 @@ data class EnhancedLogRow(
  */
 class GGLogTableModel : AbstractTableModel() {
 
+    companion object {
+        const val BASE_ROW_HEIGHT = 30
+        const val DESC_LINE_HEIGHT = 14
+    }
+
     private val rows = mutableListOf<EnhancedLogRow>()
     var hasMore: Boolean = false
     var loading: Boolean = false
@@ -49,6 +54,20 @@ class GGLogTableModel : AbstractTableModel() {
     /** Maximum graph column index across all rows (drives graph pane width). */
     var maxGraphColumn: Int = 0
         private set
+
+    /** Per-row pixel heights, computed from description line counts. */
+    var rowHeights: IntArray = IntArray(0)
+        private set
+
+    /** Cumulative Y offsets: rowOffsets[i] = sum of rowHeights[0..i-1]. */
+    var rowOffsets: IntArray = IntArray(0)
+        private set
+
+    fun getRowHeight(index: Int): Int =
+        if (index in rowHeights.indices) rowHeights[index] else BASE_ROW_HEIGHT
+
+    fun getRowOffset(index: Int): Int =
+        if (index in rowOffsets.indices) rowOffsets[index] else index * BASE_ROW_HEIGHT
 
     // --- Data access ---
 
@@ -71,6 +90,7 @@ class GGLogTableModel : AbstractTableModel() {
         hasMore = logPage.has_more
         loading = false
         addPage(logPage.rows)
+        computeRowMetrics()
         // Force a complete repaint — the clear+insert sequence above doesn't
         // fire a deletion event, so stale cells can survive as ghost artifacts.
         fireTableDataChanged()
@@ -81,11 +101,26 @@ class GGLogTableModel : AbstractTableModel() {
         hasMore = logPage.has_more
         loading = false
         addPage(logPage.rows)
+        computeRowMetrics()
     }
 
     fun markLoading() {
         loading = true
         fireTableDataChanged()
+    }
+
+    private fun computeRowMetrics() {
+        val heights = IntArray(rows.size)
+        val offsets = IntArray(rows.size)
+        var cumulative = 0
+        for (i in rows.indices) {
+            val descLineCount = rows[i].row.revision.description.lines.size
+            heights[i] = BASE_ROW_HEIGHT + maxOf(0, descLineCount - 1) * DESC_LINE_HEIGHT
+            offsets[i] = cumulative
+            cumulative += heights[i]
+        }
+        rowHeights = heights
+        rowOffsets = offsets
     }
 
     /** Ported from addPageToGraph() in LogPane.svelte */
