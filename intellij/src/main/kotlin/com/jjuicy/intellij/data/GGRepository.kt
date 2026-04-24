@@ -27,7 +27,7 @@ val GG_LOG_CHANGED: Topic<GGRepository.LogListener> =
 //   rest is the remainder to reach 12 chars. Brackets delimit the split; safe because change IDs
 //   use only a-z. changePrefix+changeRest is used as the jj revision specifier.
 // NOTE: descriptions whose first line contains '|' will corrupt parsing (accepted trade-off).
-private const val LOG_TEMPLATE = """change_id.shortest(12).prefix() ++ "[" ++ change_id.shortest(12).rest() ++ "]" ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", bookmarks.map(|b| b.name())) ++ "|" ++ separate(",", remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote())) ++ "\n""""
+private const val LOG_TEMPLATE = """change_id.shortest(12).prefix() ++ "[" ++ change_id.shortest(12).rest() ++ "]" ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ bookmarks.map(|b| b.name()).join(",") ++ "|" ++ remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote()).join(",") ++ "\n""""
 
 /**
  * Project-scoped data façade that speaks directly to the `jj` CLI.
@@ -287,11 +287,14 @@ class GGRepository(private val project: Project) : Disposable {
             val localBookmarkNames = parts[11].split(",").filter { it.isNotBlank() }
             val remoteBookmarkTokens = parts[12].split(",").filter { it.isNotBlank() }
 
+            val localBookmarkNamesSet = localBookmarkNames.toSet()
             val localRefs = localBookmarkNames.map { name ->
+                // synced = the remote counterpart is at this same commit
+                val isSynced = remoteBookmarkTokens.any { it.startsWith("$name@") }
                 StoreRef.LocalBookmark(
                     bookmark_name = name,
                     has_conflict = false,
-                    is_synced = true,
+                    is_synced = isSynced,
                     tracking_remotes = emptyList(),
                     available_remotes = 0,
                     potential_remotes = 0,
@@ -300,14 +303,18 @@ class GGRepository(private val project: Project) : Disposable {
             val remoteRefs = remoteBookmarkTokens.mapNotNull { token ->
                 // format: "name@remote" (e.g. "main@origin")
                 val atIdx = token.lastIndexOf('@')
-                if (atIdx > 0) StoreRef.RemoteBookmark(
-                    bookmark_name = token.substring(0, atIdx),
-                    remote_name = token.substring(atIdx + 1),
-                    has_conflict = false,
-                    is_synced = false,
-                    is_tracked = true,
-                    is_absent = false,
-                ) else null
+                if (atIdx > 0) {
+                    val name = token.substring(0, atIdx)
+                    // hide remote chip when the local bookmark is co-located (synced) — just show green
+                    if (name !in localBookmarkNamesSet) StoreRef.RemoteBookmark(
+                        bookmark_name = name,
+                        remote_name = token.substring(atIdx + 1),
+                        has_conflict = false,
+                        is_synced = false,
+                        is_tracked = true,
+                        is_absent = false,
+                    ) else null
+                } else null
             }
 
             RevHeader(

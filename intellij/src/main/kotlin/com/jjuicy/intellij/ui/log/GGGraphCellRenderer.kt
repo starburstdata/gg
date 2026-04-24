@@ -162,11 +162,15 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
             val (text, color, bgColor) = when (ref) {
                 is StoreRef.LocalBookmark -> {
                     val suffix = if (!ref.is_synced) "*" else ""
-                    Triple(
-                        "${ref.bookmark_name}$suffix",
-                        if (ref.has_conflict) JBColor.RED else JBColor(0x1A_6B_2E, 0x57_A6_4A),
-                        if (ref.has_conflict) JBColor(0xFF_DD_DD, 0x4A_1A_1A) else JBColor(0xD5_F0_D5, 0x1C_3B_1C),
-                    )
+                    val (color, bgColor) = if (ref.has_conflict) {
+                        JBColor.RED to JBColor(0xFF_DD_DD, 0x4A_1A_1A)
+                    } else if (!ref.is_synced) {
+                        // yellow/amber: moved locally but not pushed yet
+                        JBColor(0x8B_6A_00, 0xF9_E2_AF) to JBColor(0xFF_F3_CC, 0x3B_30_10)
+                    } else {
+                        JBColor(0x1A_6B_2E, 0x57_A6_4A) to JBColor(0xD5_F0_D5, 0x1C_3B_1C)
+                    }
+                    Triple("${ref.bookmark_name}$suffix", color, bgColor)
                 }
                 is StoreRef.RemoteBookmark -> Triple(
                     "${ref.bookmark_name}@${ref.remote_name}",
