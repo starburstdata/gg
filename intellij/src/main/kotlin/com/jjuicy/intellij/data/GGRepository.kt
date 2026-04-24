@@ -224,7 +224,7 @@ class GGRepository(private val project: Project) : Disposable {
     }
 
     fun moveBookmark(ref: StoreRef.LocalBookmark, toId: RevId) {
-        runner.runOrThrow("bookmark", "set", ref.bookmark_name, "-r", toId.change.hex)
+        runner.runOrThrow("bookmark", "set", ref.bookmark_name, "-r", toId.change.hex, "--allow-backwards")
     }
 
     fun abandonRevisions(id: RevId) {
