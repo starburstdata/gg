@@ -107,10 +107,10 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
         }
 
         private fun buildTopRow(): JPanel {
-            val row = JPanel(FlowLayout(FlowLayout.LEFT, 2, 0))
+            val row = JPanel(BorderLayout(4, 0))
             row.isOpaque = false
-            row.add(descLabel)
-            row.add(bookmarkPanel)
+            row.add(descLabel, BorderLayout.WEST)
+            row.add(bookmarkPanel, BorderLayout.CENTER)
             return row
         }
 
