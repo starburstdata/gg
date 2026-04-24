@@ -53,9 +53,9 @@ class GGMainPanel(
             // refresh on any detected repo change
             project.messageBus.connect(parentDisposable).subscribe(GG_LOG_CHANGED, object : GGRepository.LogListener {
                 override fun onLogChanged() {
-                    val id = lastSelectedId
-                    logPanel.loadLog()
-                    if (id != null) logPanel.reselectRevision(id)
+                    // pass lastSelectedId so reselection happens after the new data loads,
+                    // not immediately against stale model data
+                    logPanel.loadLog(reselectId = lastSelectedId)
                 }
             })
 

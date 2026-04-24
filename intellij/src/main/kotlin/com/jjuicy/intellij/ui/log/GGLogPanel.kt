@@ -136,8 +136,10 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         return panel
     }
 
-    /** Load (or reload) the log. Pass a non-null [revset] to also update the revset field. */
-    fun loadLog(revset: String? = null) {
+    /** Load (or reload) the log. Pass a non-null [revset] to also update the revset field.
+     *  Pass [reselectId] to restore the previous selection after new data arrives; otherwise
+     *  the first row is selected. */
+    fun loadLog(revset: String? = null, reselectId: com.jjuicy.intellij.data.RevId? = null) {
         if (revset != null) {
             currentRevset = revset
             revsetField.text = revset
@@ -151,7 +153,9 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val page = repo.loadLog(currentRevset)
                 ApplicationManager.getApplication().invokeLater {
                     tableModel.setPage(page)
-                    if (tableModel.rowCount > 0) {
+                    if (reselectId != null) {
+                        reselectRevision(reselectId)
+                    } else if (tableModel.rowCount > 0) {
                         table.selectionModel.setSelectionInterval(0, 0)
                     }
                 }

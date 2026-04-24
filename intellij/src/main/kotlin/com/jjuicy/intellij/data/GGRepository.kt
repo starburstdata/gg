@@ -24,7 +24,7 @@ val GG_LOG_CHANGED: Topic<GGRepository.LogListener> =
 // Fields: changeRef|commitHex|commitShort|descFirstLine|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|bookmarkNames(csv)
 // changeRef = change_id.short(12): long enough to be unambiguous; used as jj revision specifier.
 // NOTE: descriptions whose first line contains '|' will corrupt parsing (accepted trade-off).
-private const val LOG_TEMPLATE = """change_id.short(12) ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", bookmarks.map(|b| b.name())) ++ "\n""""
+private const val LOG_TEMPLATE = """change_id.short(12) ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", bookmarks.map(|b| if(b.remote(), b.name() ++ "@" ++ b.remote(), b.name()))) ++ "\n""""
 
 /**
  * Project-scoped data façade that speaks directly to the `jj` CLI.
@@ -282,15 +282,28 @@ class GGRepository(private val project: Project) : Disposable {
                 has_conflict = hasConflict,
                 is_working_copy = isWC,
                 is_immutable = isImmutable,
-                refs = bookmarkNames.map { name ->
-                    StoreRef.LocalBookmark(
-                        bookmark_name = name,
-                        has_conflict = false,
-                        is_synced = true,
-                        tracking_remotes = emptyList(),
-                        available_remotes = 0,
-                        potential_remotes = 0,
-                    )
+                refs = bookmarkNames.map { token ->
+                    // "name@remote" = remote tracking ref; plain "name" = local bookmark
+                    val atIdx = token.lastIndexOf('@')
+                    if (atIdx > 0) {
+                        StoreRef.RemoteBookmark(
+                            bookmark_name = token.substring(0, atIdx),
+                            remote_name = token.substring(atIdx + 1),
+                            has_conflict = false,
+                            is_synced = false,
+                            is_tracked = true,
+                            is_absent = false,
+                        )
+                    } else {
+                        StoreRef.LocalBookmark(
+                            bookmark_name = token,
+                            has_conflict = false,
+                            is_synced = true,
+                            tracking_remotes = emptyList(),
+                            available_remotes = 0,
+                            potential_remotes = 0,
+                        )
+                    }
                 },
                 parent_ids = parentHexes.map { hex ->
                     CommitId(hex = hex, prefix = hex.take(8), rest = hex.drop(8))

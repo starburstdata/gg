@@ -145,7 +145,7 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
                     Pair("${ref.bookmark_name}$suffix", if (ref.has_conflict) JBColor.RED else JBColor(0x3D_9A_56, 0x57_A6_4A))
                 }
                 is StoreRef.RemoteBookmark -> {
-                    Pair("${ref.remote_name}/${ref.bookmark_name}", JBColor(0x4E_79_A7, 0x74_C7_EC))
+                    Pair("${ref.bookmark_name}@${ref.remote_name}", JBColor(0xC0_40_40, 0xFF_6B_6B))
                 }
                 is StoreRef.Tag -> Pair(ref.tag_name, JBColor(0x8C_6D_3F, 0xF9_E2_AF))
             }
