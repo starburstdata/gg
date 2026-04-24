@@ -26,7 +26,7 @@ val GG_LOG_CHANGED: Topic<GGRepository.LogListener> =
 // Fields: changeRef|commitHex|commitShort|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|bookmarkNames(csv)|remoteBookmarkTokens(csv)|description
 // changeRef = "prefix[rest]" from change_id.shortest(12).
 // remoteBookmarkTokens format: "name@remote" (e.g. "main@origin")
-private const val LOG_TEMPLATE = """change_id.shortest(12).prefix() ++ "[" ++ change_id.shortest(12).rest() ++ "]" ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ bookmarks.map(|b| b.name()).join(",") ++ "|" ++ remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote()).join(",") ++ "|" ++ description ++ "\0""""
+private const val LOG_TEMPLATE = """change_id.shortest(12).prefix() ++ "[" ++ change_id.shortest(12).rest() ++ "]" ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ bookmarks.map(|b| b.name() ++ "~" ++ b.remote()).join(",") ++ "|" ++ remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote()).join(",") ++ "|" ++ description ++ "\0""""
 
 /**
  * Project-scoped data façade that speaks directly to the `jj` CLI.
@@ -275,38 +275,47 @@ class GGRepository(private val project: Project) : Disposable {
             val isWC = parts[7] == "1"
             val isImmutable = parts[8] == "1"
             val hasConflict = parts[9] == "1"
-            val localBookmarkNames = parts[10].split(",").filter { it.isNotBlank() }
-            val remoteBookmarkTokens = parts[11].split(",").filter { it.isNotBlank() }
+            val bookmarkTokens = parts[10].split(",").filter { it.isNotBlank() }
             val descriptionText = parts[12].trimEnd()
 
-            val localBookmarkNamesSet = localBookmarkNames.toSet()
-            val localRefs = localBookmarkNames.map { name ->
-                // synced = the remote counterpart is at this same commit
-                val isSynced = remoteBookmarkTokens.any { it.startsWith("$name@") }
+            // bookmarks field now contains "name~remote" tokens; empty remote = local
+            val localNames = mutableListOf<String>()
+            val remoteEntries = mutableListOf<Pair<String, String>>()
+            for (token in bookmarkTokens) {
+                val tildeIdx = token.indexOf('~')
+                if (tildeIdx < 0) continue
+                val name = token.substring(0, tildeIdx)
+                val remote = token.substring(tildeIdx + 1)
+                if (remote.isEmpty()) {
+                    localNames.add(name)
+                } else {
+                    remoteEntries.add(name to remote)
+                }
+            }
+
+            val localNameSet = localNames.toSet()
+            val remoteNameSet = remoteEntries.map { it.first }.toSet()
+
+            val localRefs = localNames.map { name ->
                 StoreRef.LocalBookmark(
                     bookmark_name = name,
                     has_conflict = false,
-                    is_synced = isSynced,
+                    is_synced = name in remoteNameSet,
                     tracking_remotes = emptyList(),
                     available_remotes = 0,
                     potential_remotes = 0,
                 )
             }
-            val remoteRefs = remoteBookmarkTokens.mapNotNull { token ->
-                // format: "name@remote" (e.g. "main@origin")
-                val atIdx = token.lastIndexOf('@')
-                if (atIdx > 0) {
-                    val name = token.substring(0, atIdx)
-                    // hide remote chip when the local bookmark is co-located (synced) — just show green
-                    if (name !in localBookmarkNamesSet) StoreRef.RemoteBookmark(
-                        bookmark_name = name,
-                        remote_name = token.substring(atIdx + 1),
-                        has_conflict = false,
-                        is_synced = false,
-                        is_tracked = true,
-                        is_absent = false,
-                    ) else null
-                } else null
+            val remoteRefs = remoteEntries.mapNotNull { (name, remote) ->
+                // hide remote chip when the local bookmark is co-located (synced)
+                if (name !in localNameSet) StoreRef.RemoteBookmark(
+                    bookmark_name = name,
+                    remote_name = remote,
+                    has_conflict = false,
+                    is_synced = false,
+                    is_tracked = true,
+                    is_absent = false,
+                ) else null
             }
 
             val descLines = if (descriptionText.isEmpty()) listOf("")
