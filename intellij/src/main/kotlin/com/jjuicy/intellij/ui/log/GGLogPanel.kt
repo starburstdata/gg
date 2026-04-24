@@ -93,14 +93,15 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
         }
 
-        // Double-click to edit description; right-click for context menu; drag chips to move bookmarks
+        // Double-click to edit (make working copy); right-click for context menu; drag chips to move bookmarks
         val mouseHandler = object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount == 2) {
                     val row = table.rowAtPoint(e.point)
                     if (row >= 0) {
                         table.selectionModel.setSelectionInterval(row, row)
-                        editDescription()
+                        val header = tableModel.getEnhancedRow(row).row.revision
+                        editRevision(header)
                     }
                 }
             }
@@ -285,13 +286,22 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
             rows = maxOf(3, header.description.lines.size + 1)
             columns = 50
         }
-        val scrollPane = JBScrollPane(textArea).apply {
+        val textScrollPane = JBScrollPane(textArea).apply {
             preferredSize = Dimension(400, 120)
         }
 
+        val saveButton = JButton("Save")
+        val buttonPanel = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 0, 0)).apply {
+            add(saveButton)
+        }
+        val content = JPanel(BorderLayout()).apply {
+            add(textScrollPane, BorderLayout.CENTER)
+            add(buttonPanel, BorderLayout.SOUTH)
+        }
+
         val popup = JBPopupFactory.getInstance()
-            .createComponentPopupBuilder(scrollPane, textArea)
-            .setTitle("Edit Description (Ctrl+Enter to save)")
+            .createComponentPopupBuilder(content, textArea)
+            .setTitle("Edit Description (Enter to save)")
             .setMovable(true)
             .setResizable(true)
             .setRequestFocus(true)
@@ -299,18 +309,24 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
             .setCancelOnOtherWindowOpen(false)
             .createPopup()
 
+        val saveAction = {
+            val newDesc = textArea.text
+            popup.cancel()
+            runMutation("Describe revision") {
+                GGRepository.getInstance(project).describeRevision(header.id, newDesc)
+            }
+        }
+
         textArea.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
-                if ((e.isControlDown || e.isMetaDown) && e.keyCode == KeyEvent.VK_ENTER) {
-                    val newDesc = textArea.text
-                    popup.cancel()
-                    runMutation("Describe revision") {
-                        GGRepository.getInstance(project).describeRevision(header.id, newDesc)
-                    }
+                if (e.keyCode == KeyEvent.VK_ENTER && !e.isShiftDown) {
                     e.consume()
+                    saveAction()
                 }
             }
         })
+
+        saveButton.addActionListener { saveAction() }
 
         val cellRect = table.getCellRect(row, 0, true)
         val relPoint = RelativePoint(table, Point(cellRect.x, cellRect.y + cellRect.height))
