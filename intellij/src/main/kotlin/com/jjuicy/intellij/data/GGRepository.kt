@@ -21,11 +21,11 @@ val GG_LOG_CHANGED: Topic<GGRepository.LogListener> =
     Topic.create("GG Log Changed", GGRepository.LogListener::class.java)
 
 // jj log template — pipe-separated fields, one commit per line.
-// Fields: changeRef|commitHex|commitShort|descFirstLine|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|localBookmarkNames(csv)|remoteBookmarkTokens(csv)
+// Fields: changeRef|commitHex|commitShort|descFirstLine|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|bookmarkNames(csv)|remoteBookmarkTokens(csv)
 // remoteBookmarkTokens format: "name@remote" (e.g. "main@origin")
 // changeRef = change_id.short(12): long enough to be unambiguous; used as jj revision specifier.
 // NOTE: descriptions whose first line contains '|' will corrupt parsing (accepted trade-off).
-private const val LOG_TEMPLATE = """change_id.short(12) ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", local_bookmarks.map(|b| b.name())) ++ "|" ++ separate(",", remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote())) ++ "\n""""
+private const val LOG_TEMPLATE = """change_id.short(12) ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", bookmarks.map(|b| b.name())) ++ "|" ++ separate(",", remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote())) ++ "\n""""
 
 /**
  * Project-scoped data façade that speaks directly to the `jj` CLI.

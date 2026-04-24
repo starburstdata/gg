@@ -191,7 +191,7 @@ class GGLogPanel(private val project: Project) : JPanel(BorderLayout()) {
         cellComp.setSize(cellRect.width, cellRect.height)
         forceLayout(cellComp)
         val hit = SwingUtilities.getDeepestComponentAt(cellComp, cellPoint.x, cellPoint.y)
-        val ref = (hit as? JLabel)?.getClientProperty("gg.ref") as? StoreRef.LocalBookmark
+        val ref = (hit as? JComponent)?.getClientProperty("gg.ref") as? StoreRef.LocalBookmark
         return if (ref != null) Pair(row, ref) else null
     }
 

@@ -1,13 +1,17 @@
 package com.jjuicy.intellij.ui.log
 
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import com.jjuicy.intellij.data.StoreRef
 import java.awt.*
 import javax.swing.*
 import javax.swing.table.TableCellRenderer
+
+private val LOG = logger<GGGraphCellRenderer>()
 
 /**
  * TableCellRenderer for the commit log.
@@ -32,7 +36,9 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
         // Renderer is a rubber stamp — Swing won't auto-layout dynamic children
         // (bookmarkPanel chips change per row). Force a full validate pass now so
         // chips have non-zero bounds before the cell is painted.
+        cell.setSize(table.width, table.rowHeight)
         cell.validate()
+        LOG.warn("GG-DEBUG cell bounds=${cell.bounds} size=${cell.size}")
         return cell
     }
 
@@ -123,9 +129,11 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
             }
 
             bookmarkPanel.removeAll()
+            LOG.warn("GG-DEBUG refs for '${header.description.firstLine.ifBlank { "(no desc)" }}': ${header.refs}")
             for (ref in header.refs) {
                 bookmarkPanel.add(makeChip(ref, selected))
             }
+            LOG.warn("GG-DEBUG bookmarkPanel children after add: ${bookmarkPanel.componentCount}, bounds=${bookmarkPanel.bounds}")
             for (fork in hiddenForks) {
                 bookmarkPanel.add(makeHiddenForkChip(fork, selected))
             }
@@ -138,36 +146,45 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
             )
         }
 
-        private fun makeChip(ref: StoreRef, selected: Boolean): JLabel {
-            val (text, color) = when (ref) {
+        private fun makeChip(ref: StoreRef, selected: Boolean): SimpleColoredComponent {
+            val (text, color, bgColor) = when (ref) {
                 is StoreRef.LocalBookmark -> {
                     val suffix = if (!ref.is_synced) "*" else ""
-                    Pair("${ref.bookmark_name}$suffix", if (ref.has_conflict) JBColor.RED else JBColor(0x3D_9A_56, 0x57_A6_4A))
+                    Triple(
+                        "${ref.bookmark_name}$suffix",
+                        if (ref.has_conflict) JBColor.RED else JBColor(0x1A_6B_2E, 0x57_A6_4A),
+                        if (ref.has_conflict) JBColor(0xFF_DD_DD, 0x4A_1A_1A) else JBColor(0xD5_F0_D5, 0x1C_3B_1C),
+                    )
                 }
-                is StoreRef.RemoteBookmark -> {
-                    Pair("${ref.bookmark_name}@${ref.remote_name}", JBColor(0xC0_40_40, 0xFF_6B_6B))
-                }
-                is StoreRef.Tag -> Pair(ref.tag_name, JBColor(0x8C_6D_3F, 0xF9_E2_AF))
+                is StoreRef.RemoteBookmark -> Triple(
+                    "${ref.bookmark_name}@${ref.remote_name}",
+                    JBColor(0xA0_20_20, 0xFF_8A_8A),
+                    JBColor(0xFF_E0_E0, 0x4A_1A_1A),
+                )
+                is StoreRef.Tag -> Triple(
+                    ref.tag_name,
+                    JBColor(0x6B_4E_1A, 0xF9_E2_AF),
+                    JBColor(0xFD_F3_D0, 0x3B_30_10),
+                )
             }
-            val lbl = JLabel(" $text ")
-            lbl.font = lbl.font.deriveFont(lbl.font.size2D * 0.85f)
-            lbl.foreground = if (selected) UIManager.getColor("Table.selectionForeground") else color
-            lbl.border = BorderFactory.createLineBorder(
-                if (selected) UIManager.getColor("Table.selectionForeground")!! else color,
-                1
-            )
+            val chip = SimpleColoredComponent()
+            chip.append(" $text ", SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, color))
+            chip.border = BorderFactory.createLineBorder(color, 1)
+            chip.isOpaque = true
+            chip.background = bgColor
             // tag local bookmarks so drag-and-drop hit testing can identify them
-            if (ref is StoreRef.LocalBookmark) lbl.putClientProperty("gg.ref", ref)
-            return lbl
+            if (ref is StoreRef.LocalBookmark) chip.putClientProperty("gg.ref", ref)
+            return chip
         }
 
-        private fun makeHiddenForkChip(name: String, selected: Boolean): JLabel {
-            val color = JBColor(Color(0x88_88_88), Color(0x88_88_88))
-            val lbl = JLabel(" ↙$name ")
-            lbl.font = lbl.font.deriveFont(lbl.font.size2D * 0.85f)
-            lbl.foreground = color
-            lbl.border = BorderFactory.createLineBorder(color, 1)
-            return lbl
+        private fun makeHiddenForkChip(name: String, selected: Boolean): SimpleColoredComponent {
+            val color = JBColor(Color(0x60_60_60), Color(0x99_99_99))
+            val chip = SimpleColoredComponent()
+            chip.append(" ↙$name ", SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, color))
+            chip.border = BorderFactory.createLineBorder(color, 1)
+            chip.isOpaque = true
+            chip.background = JBColor(Color(0xE8_E8_E8), Color(0x30_30_30))
+            return chip
         }
 
         private fun formatTimestamp(ts: String): String {

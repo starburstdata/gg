@@ -71,11 +71,9 @@ class GGLogTableModel : AbstractTableModel() {
         hasMore = logPage.has_more
         loading = false
         addPage(logPage.rows)
-        // Force a fresh paint of every row — the clear+insert sequence above
-        // doesn't notify the table about deletions, so stale cells can survive
-        // as ghost artifacts. fireTableRowsUpdated repaints without touching
-        // the column model or registered renderers (unlike fireTableDataChanged).
-        if (rows.isNotEmpty()) fireTableRowsUpdated(0, rows.size - 1)
+        // Force a complete repaint — the clear+insert sequence above doesn't
+        // fire a deletion event, so stale cells can survive as ghost artifacts.
+        fireTableDataChanged()
     }
 
     /** Append an additional page (for infinite scroll / paginated loading). */
