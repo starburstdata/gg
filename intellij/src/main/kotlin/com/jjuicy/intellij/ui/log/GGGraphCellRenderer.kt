@@ -1,17 +1,13 @@
 package com.jjuicy.intellij.ui.log
 
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
-import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import com.jjuicy.intellij.data.StoreRef
 import java.awt.*
 import javax.swing.*
 import javax.swing.table.TableCellRenderer
-
-private val LOG = logger<GGGraphCellRenderer>()
 
 /**
  * TableCellRenderer for the commit log.
@@ -34,12 +30,19 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
         val enhanced = value as? EnhancedLogRow ?: return cell
         cell.prepare(enhanced, row, isSelected, model.maxGraphColumn)
         // Renderer is a rubber stamp — Swing won't auto-layout dynamic children
-        // (bookmarkPanel chips change per row). Force a full validate pass now so
-        // chips have non-zero bounds before the cell is painted.
-        cell.setSize(table.width, table.rowHeight)
-        cell.validate()
-        LOG.warn("GG-DEBUG cell bounds=${cell.bounds} size=${cell.size}")
+        // (bookmarkPanel chips change per row). Use the actual cell rect so FlowLayout
+        // doesn't wrap chips to a second line when table.width hasn't settled yet.
+        val cellRect = table.getCellRect(row, column, false)
+        cell.setSize(cellRect.width, cellRect.height)
+        forceLayout(cell)
         return cell
+    }
+
+    private fun forceLayout(c: Component) {
+        if (c is Container) {
+            c.doLayout()
+            for (child in c.components) forceLayout(child)
+        }
     }
 
     /** Single panel that owns all sub-components and does custom painting. */
@@ -129,11 +132,9 @@ class GGGraphCellRenderer(private val model: GGLogTableModel) : TableCellRendere
             }
 
             bookmarkPanel.removeAll()
-            LOG.warn("GG-DEBUG refs for '${header.description.firstLine.ifBlank { "(no desc)" }}': ${header.refs}")
             for (ref in header.refs) {
                 bookmarkPanel.add(makeChip(ref, selected))
             }
-            LOG.warn("GG-DEBUG bookmarkPanel children after add: ${bookmarkPanel.componentCount}, bounds=${bookmarkPanel.bounds}")
             for (fork in hiddenForks) {
                 bookmarkPanel.add(makeHiddenForkChip(fork, selected))
             }
