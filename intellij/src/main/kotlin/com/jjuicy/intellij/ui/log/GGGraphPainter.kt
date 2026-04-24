@@ -94,8 +94,8 @@ object GGGraphPainter {
         val r1 = line.source.row
         val r2 = line.target.row
 
-        // child connection point: near bottom of child row
-        val childY = rowOffset(r1, rowOffsets) + rowHeight(r1, rowHeights) - 9f
+        // child connection point: just below the node centre (15px + 6px clearance)
+        val childY = rowOffset(r1, rowOffsets) + 21f
         // parent connection point: near top of parent row
         val parentY = rowOffset(r2, rowOffsets) + 9f
 
