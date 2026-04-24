@@ -68,61 +68,7 @@ intellijPlatform {
     }
 }
 
-val ggRootDir = file("..")
-val binaryName = if (System.getProperty("os.name", "").lowercase().contains("windows")) "gg.exe" else "gg"
-
-// build the Svelte/TypeScript frontend (must run before cargo so assets get embedded)
-// find the highest nvm node major version that satisfies vite's ≥20 requirement,
-// so the task works even when the shell's default node is too old
-fun nvmNodeBinDir(): String? {
-    val nvmDir = file("${System.getProperty("user.home")}/.nvm/versions/node")
-    if (!nvmDir.isDirectory) return null
-    return nvmDir.listFiles()
-        ?.mapNotNull { dir ->
-            val major = dir.name.removePrefix("v").substringBefore(".").toIntOrNull()
-            if (major != null && major >= 20) dir to major else null
-        }
-        ?.maxByOrNull { (_, major) -> major }
-        ?.first
-        ?.resolve("bin")
-        ?.takeIf { it.isDirectory }
-        ?.absolutePath
-}
-
-val buildGGFrontend by tasks.registering(Exec::class) {
-    group = "gg"
-    description = "Build the GG Svelte/TypeScript frontend"
-    workingDir = ggRootDir
-    // call vite directly to skip the prebuild (svelte-check) lifecycle hook
-    commandLine("npx", "vite", "build")
-    // prepend a nvm-managed node ≥20 if the system node is older
-    nvmNodeBinDir()?.let { binDir ->
-        environment("PATH", "$binDir:${System.getenv("PATH")}")
-    }
-}
-
-// build the Rust binary (embeds the pre-built frontend assets)
-val buildGGBinary by tasks.registering(Exec::class) {
-    group = "gg"
-    description = "Build the GG Rust binary with cargo --release"
-    dependsOn(buildGGFrontend)
-    workingDir = ggRootDir
-    commandLine("cargo", "build", "--release")
-}
-
-// copy the binary into the JAR resources so it ships with the plugin
-val copyGGBinary by tasks.registering(Copy::class) {
-    group = "gg"
-    description = "Copy the built GG binary into plugin resources"
-    dependsOn(buildGGBinary)
-    from(file("../target/release/$binaryName"))
-    into(file("src/main/resources/binaries"))
-}
-
 tasks {
-    processResources {
-        dependsOn(copyGGBinary)
-    }
     wrapper {
         gradleVersion = "8.14"
     }
