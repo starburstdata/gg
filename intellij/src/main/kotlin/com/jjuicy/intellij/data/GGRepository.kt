@@ -21,10 +21,11 @@ val GG_LOG_CHANGED: Topic<GGRepository.LogListener> =
     Topic.create("GG Log Changed", GGRepository.LogListener::class.java)
 
 // jj log template — pipe-separated fields, one commit per line.
-// Fields: changeRef|commitHex|commitShort|descFirstLine|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|bookmarkNames(csv)
+// Fields: changeRef|commitHex|commitShort|descFirstLine|authorName|authorEmail|timestamp|parentCommitHexes(csv)|isWC|isImmutable|hasConflict|localBookmarkNames(csv)|remoteBookmarkTokens(csv)
+// remoteBookmarkTokens format: "name@remote" (e.g. "main@origin")
 // changeRef = change_id.short(12): long enough to be unambiguous; used as jj revision specifier.
 // NOTE: descriptions whose first line contains '|' will corrupt parsing (accepted trade-off).
-private const val LOG_TEMPLATE = """change_id.short(12) ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", bookmarks.map(|b| if(b.remote(), b.name() ++ "@" ++ b.remote(), b.name()))) ++ "\n""""
+private const val LOG_TEMPLATE = """change_id.short(12) ++ "|" ++ commit_id.short(64) ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "|" ++ author.email() ++ "|" ++ author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "|" ++ parents.map(|p| p.commit_id().short(64)).join(",") ++ "|" ++ if(current_working_copy, "1", "0") ++ "|" ++ if(immutable, "1", "0") ++ "|" ++ if(conflict, "1", "0") ++ "|" ++ separate(",", local_bookmarks.map(|b| b.name())) ++ "|" ++ separate(",", remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote())) ++ "\n""""
 
 /**
  * Project-scoped data façade that speaks directly to the `jj` CLI.
@@ -257,10 +258,10 @@ class GGRepository(private val project: Project) : Disposable {
 
     private fun parseLogLine(line: String): RevHeader? {
         val parts = line.split("|")
-        if (parts.size < 12) return null
+        if (parts.size < 13) return null
         return try {
             val changeRef = parts[0]      // change_id.short(12) — used as jj revision specifier
-            val commitHex = parts[1]      // commit_id.hex()
+            val commitHex = parts[1]      // commit_id.short(64) — full hex
             val commitShort = parts[2]    // commit_id.short()
             val descFirstLine = parts[3]
             val authorName = parts[4]
@@ -270,7 +271,31 @@ class GGRepository(private val project: Project) : Disposable {
             val isWC = parts[8] == "1"
             val isImmutable = parts[9] == "1"
             val hasConflict = parts[10] == "1"
-            val bookmarkNames = parts[11].split(",").filter { it.isNotBlank() }
+            val localBookmarkNames = parts[11].split(",").filter { it.isNotBlank() }
+            val remoteBookmarkTokens = parts[12].split(",").filter { it.isNotBlank() }
+
+            val localRefs = localBookmarkNames.map { name ->
+                StoreRef.LocalBookmark(
+                    bookmark_name = name,
+                    has_conflict = false,
+                    is_synced = true,
+                    tracking_remotes = emptyList(),
+                    available_remotes = 0,
+                    potential_remotes = 0,
+                )
+            }
+            val remoteRefs = remoteBookmarkTokens.mapNotNull { token ->
+                // format: "name@remote" (e.g. "main@origin")
+                val atIdx = token.lastIndexOf('@')
+                if (atIdx > 0) StoreRef.RemoteBookmark(
+                    bookmark_name = token.substring(0, atIdx),
+                    remote_name = token.substring(atIdx + 1),
+                    has_conflict = false,
+                    is_synced = false,
+                    is_tracked = true,
+                    is_absent = false,
+                ) else null
+            }
 
             RevHeader(
                 id = RevId(
@@ -282,29 +307,7 @@ class GGRepository(private val project: Project) : Disposable {
                 has_conflict = hasConflict,
                 is_working_copy = isWC,
                 is_immutable = isImmutable,
-                refs = bookmarkNames.map { token ->
-                    // "name@remote" = remote tracking ref; plain "name" = local bookmark
-                    val atIdx = token.lastIndexOf('@')
-                    if (atIdx > 0) {
-                        StoreRef.RemoteBookmark(
-                            bookmark_name = token.substring(0, atIdx),
-                            remote_name = token.substring(atIdx + 1),
-                            has_conflict = false,
-                            is_synced = false,
-                            is_tracked = true,
-                            is_absent = false,
-                        )
-                    } else {
-                        StoreRef.LocalBookmark(
-                            bookmark_name = token,
-                            has_conflict = false,
-                            is_synced = true,
-                            tracking_remotes = emptyList(),
-                            available_remotes = 0,
-                            potential_remotes = 0,
-                        )
-                    }
-                },
+                refs = localRefs + remoteRefs,
                 parent_ids = parentHexes.map { hex ->
                     CommitId(hex = hex, prefix = hex.take(8), rest = hex.drop(8))
                 },
