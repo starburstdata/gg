@@ -732,23 +732,20 @@ impl WorkspaceSession<'_> {
         let mut query_choices = HashMap::new();
         query_choices.insert("default".to_string(), default_revset.clone());
 
-        if self.data.query_choices.is_empty() {
-            query_choices.insert(
-                "tracked-bookmarks".to_string(),
-                "@ | ancestors(bookmarks(), 5)".to_string(),
-            );
-            query_choices.insert(
-                "local-bookmarks".to_string(),
-                "@ | ancestors(bookmarks())".to_string(),
-            );
-            query_choices.insert(
-                "remote-bookmarks".to_string(),
-                "@ | ancestors(remote_bookmarks(), 5)".to_string(),
-            );
-            query_choices.insert("all-revisions".to_string(), "all()".to_string());
-        } else {
-            query_choices.extend(self.data.query_choices.clone());
-        }
+        query_choices.insert(
+            "tracked-bookmarks".to_string(),
+            "@ | ancestors(bookmarks(), 5)".to_string(),
+        );
+        query_choices.insert(
+            "local-bookmarks".to_string(),
+            "@ | ancestors(bookmarks())".to_string(),
+        );
+        query_choices.insert(
+            "remote-bookmarks".to_string(),
+            "@ | ancestors(remote_bookmarks(), 5)".to_string(),
+        );
+        query_choices.insert("all-revisions".to_string(), "all()".to_string());
+        query_choices.extend(self.data.query_choices.clone());
 
         let latest_query = self
             .session

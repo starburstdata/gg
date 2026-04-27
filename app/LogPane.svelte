@@ -242,16 +242,6 @@
     $: isDeletable =
         !isCustom && presets.some((p) => !p.separator && p.value === entered_query && p.label !== "Default");
 
-    function writePresets() {
-        let values: Record<string, string> = {};
-        for (let [key, value] of Object.entries(query_choices)) {
-            if (key !== "default") {
-                values[key] = value;
-            }
-        }
-        trigger("write_config_table", { scope: "repo", key: ["gg", "presets"], values });
-    }
-
     function toKebabCase(text: string): string {
         return text
             .trim()
@@ -261,15 +251,19 @@
     }
 
     async function handleSavePreset() {
-        let response = await getInput("Save Revset", "code:" + entered_query, ["Preset Name"]);
+        let response = await getInput("Save Revset", "code:" + entered_query, [
+            { label: "Preset Name", choices: [] },
+            { label: "Save globally", choices: ["false", "true"] },
+        ]);
         if (!response) return;
 
         let name = toKebabCase(response["Preset Name"]);
         if (!name || name === "default") return;
 
+        let scope = response["Save globally"] === "true" ? "user" : "repo";
         query_choices[name] = entered_query;
         query_choices = query_choices;
-        writePresets();
+        trigger("write_config_entry", { scope, key: ["gg", "presets", name], value: entered_query });
     }
 
     function handleDeletePreset() {
@@ -281,7 +275,9 @@
         delete query_choices[keyToDelete];
         query_choices = query_choices;
         entered_query = query_choices["default"] ?? "";
-        writePresets();
+        // attempt deletion from both scopes; one will be a no-op
+        trigger("delete_config_entry", { scope: "repo", key: ["gg", "presets", keyToDelete] });
+        trigger("delete_config_entry", { scope: "user", key: ["gg", "presets", keyToDelete] });
         reloadLog();
     }
 
