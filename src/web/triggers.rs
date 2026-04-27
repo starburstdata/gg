@@ -15,6 +15,8 @@ pub fn router() -> Router<AppState> {
         .route("/begin_shutdown", post(begin_shutdown))
         .route("/end_shutdown", post(end_shutdown))
         .route("/write_config_table", post(write_config_table))
+        .route("/write_config_entry", post(write_config_entry))
+        .route("/delete_config_entry", post(delete_config_entry))
 }
 
 #[derive(Deserialize)]
@@ -59,6 +61,60 @@ async fn write_config_table(
         scope: config_scope,
         key: body.key,
         values: body.values,
+    }) {
+        Ok(()) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+#[derive(Deserialize)]
+struct WriteConfigEntryRequest {
+    #[allow(dead_code)]
+    client_id: String,
+    scope: String,
+    key: Vec<String>,
+    value: String,
+}
+
+async fn write_config_entry(
+    State(state): State<AppState>,
+    Json(body): Json<WriteConfigEntryRequest>,
+) -> StatusCode {
+    let config_scope = match body.scope.as_str() {
+        "user" => ConfigSource::User,
+        "repo" => ConfigSource::Repo,
+        _ => return StatusCode::BAD_REQUEST,
+    };
+    match state.worker_tx.send(SessionEvent::WriteConfigEntry {
+        scope: config_scope,
+        key: body.key,
+        value: body.value,
+    }) {
+        Ok(()) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+#[derive(Deserialize)]
+struct DeleteConfigEntryRequest {
+    #[allow(dead_code)]
+    client_id: String,
+    scope: String,
+    key: Vec<String>,
+}
+
+async fn delete_config_entry(
+    State(state): State<AppState>,
+    Json(body): Json<DeleteConfigEntryRequest>,
+) -> StatusCode {
+    let config_scope = match body.scope.as_str() {
+        "user" => ConfigSource::User,
+        "repo" => ConfigSource::Repo,
+        _ => return StatusCode::BAD_REQUEST,
+    };
+    match state.worker_tx.send(SessionEvent::DeleteConfigEntry {
+        scope: config_scope,
+        key: body.key,
     }) {
         Ok(()) => StatusCode::OK,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,

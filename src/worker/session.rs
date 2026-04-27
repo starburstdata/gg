@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     panic::AssertUnwindSafe,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::mpsc::{Receiver, Sender},
 };
 
@@ -117,6 +117,17 @@ pub enum SessionEvent {
         scope: ConfigSource,
         key: Vec<String>,
         values: HashMap<String, String>,
+    },
+    /// Write a single string value to jj config at the given scope and path.
+    WriteConfigEntry {
+        scope: ConfigSource,
+        key: Vec<String>,
+        value: String,
+    },
+    /// Delete a single value from jj config at the given scope and path.
+    DeleteConfigEntry {
+        scope: ConfigSource,
+        key: Vec<String>,
     },
 }
 
@@ -374,25 +385,8 @@ impl Session for WorkspaceSession<'_> {
                 }
                 SessionEvent::WriteConfigArray { scope, key, values } => {
                     let name: ConfigNamePathBuf = key.iter().collect();
-                    let mut config_env = ConfigEnv::from_environment();
                     let result: Result<()> = (|| {
-                        let path = match scope {
-                            ConfigSource::User => config_env
-                                .user_config_paths()
-                                // TODO: If there are multiple config paths, is there
-                                // a more intelligent way to pick one?
-                                .next()
-                                .map(|p| p.to_path_buf())
-                                .ok_or_else(|| anyhow!("No user config path found to edit")),
-                            ConfigSource::Repo => {
-                                config_env.reset_repo_path(self.workspace.repo_path());
-                                config_env
-                                    .repo_config_path(&Ui::null())
-                                    .map_err(|e| anyhow!("{e:?}"))?
-                                    .ok_or_else(|| anyhow!("No repo config path available"))
-                            }
-                            _ => Err(anyhow!("Can't get path for config source {scope:?}")),
-                        }?;
+                        let path = resolve_config_path(scope, self.workspace.repo_path())?;
                         let toml_array: toml_edit::Value =
                             toml_edit::Value::Array(values.iter().collect());
                         let mut file = jj_lib::config::ConfigFile::load_or_empty(scope, &path)?;
@@ -414,23 +408,8 @@ impl Session for WorkspaceSession<'_> {
                 }
                 SessionEvent::WriteConfigTable { scope, key, values } => {
                     let name: ConfigNamePathBuf = key.iter().collect();
-                    let mut config_env = ConfigEnv::from_environment();
                     let result: Result<()> = (|| {
-                        let path = match scope {
-                            ConfigSource::User => config_env
-                                .user_config_paths()
-                                .next()
-                                .map(|p| p.to_path_buf())
-                                .ok_or_else(|| anyhow!("No user config path found to edit")),
-                            ConfigSource::Repo => {
-                                config_env.reset_repo_path(self.workspace.repo_path());
-                                config_env
-                                    .repo_config_path(&Ui::null())
-                                    .map_err(|e| anyhow!("{e:?}"))?
-                                    .ok_or_else(|| anyhow!("No repo config path available"))
-                            }
-                            _ => Err(anyhow!("Can't get path for config source {scope:?}")),
-                        }?;
+                        let path = resolve_config_path(scope, self.workspace.repo_path())?;
                         let mut table = toml_edit::InlineTable::new();
                         for (k, v) in &values {
                             table.insert(k, v.as_str().into());
@@ -452,8 +431,77 @@ impl Session for WorkspaceSession<'_> {
                         self.data.query_choices,
                     ) = read_config(Some(self.workspace.repo_path()))?;
                 }
+                SessionEvent::WriteConfigEntry { scope, key, value } => {
+                    let name: ConfigNamePathBuf = key.iter().collect();
+                    let result: Result<()> = (|| {
+                        let path = resolve_config_path(scope, self.workspace.repo_path())?;
+                        let mut file =
+                            jj_lib::config::ConfigFile::load_or_empty(scope, &path)?;
+                        file.set_value(&name, toml_edit::Value::from(value.as_str()))?;
+                        file.save()?;
+                        Ok(())
+                    })();
+
+                    if let Err(err) = result {
+                        log::warn!("Failed to write config entry: {err:#}");
+                    }
+
+                    (
+                        self.data.workspace_settings,
+                        self.data.aliases_map,
+                        self.data.fileset_aliases_map,
+                        self.data.query_choices,
+                    ) = read_config(Some(self.workspace.repo_path()))?;
+                }
+                SessionEvent::DeleteConfigEntry { scope, key } => {
+                    let name: ConfigNamePathBuf = key.iter().collect();
+                    let result: Result<()> = (|| {
+                        let path = resolve_config_path(scope, self.workspace.repo_path())?;
+                        let mut file =
+                            jj_lib::config::ConfigFile::load_or_empty(scope, &path)?;
+                        // only save if the entry existed, to avoid creating an empty config file
+                        if file.delete_value(&name)?.is_some() {
+                            file.save()?;
+                        }
+                        Ok(())
+                    })();
+
+                    if let Err(err) = result {
+                        log::warn!("Failed to delete config entry: {err:#}");
+                    }
+
+                    (
+                        self.data.workspace_settings,
+                        self.data.aliases_map,
+                        self.data.fileset_aliases_map,
+                        self.data.query_choices,
+                    ) = read_config(Some(self.workspace.repo_path()))?;
+                }
             };
         }
+    }
+}
+
+/// Resolve the on-disk config file path for a given scope. Used by handlers
+/// that mutate user or repo-level jj config.
+fn resolve_config_path(scope: ConfigSource, repo_path: &Path) -> Result<PathBuf> {
+    let mut config_env = ConfigEnv::from_environment();
+    match scope {
+        ConfigSource::User => config_env
+            .user_config_paths()
+            // TODO: If there are multiple config paths, is there a more
+            // intelligent way to pick one?
+            .next()
+            .map(|p| p.to_path_buf())
+            .ok_or_else(|| anyhow!("No user config path found to edit")),
+        ConfigSource::Repo => {
+            config_env.reset_repo_path(repo_path);
+            config_env
+                .repo_config_path(&Ui::null())
+                .map_err(|e| anyhow!("{e:?}"))?
+                .ok_or_else(|| anyhow!("No repo config path available"))
+        }
+        _ => Err(anyhow!("Can't get path for config source {scope:?}")),
     }
 }
 

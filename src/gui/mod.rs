@@ -224,6 +224,8 @@ pub fn run_gui(options: super::RunOptions) -> Result<()> {
             rename_workspace,
             undo_operation,
             write_config_table,
+            write_config_entry,
+            delete_config_entry,
         ])
         .menu(move |handle| menu::build_main(handle, &recent_workspaces))
         .manage(AppState::new(
@@ -838,6 +840,60 @@ fn write_config_table(
             scope: config_scope,
             key,
             values,
+        })
+        .map_err(InvokeError::from_error)?;
+    Ok(())
+}
+
+#[tauri::command(async)]
+fn write_config_entry(
+    window: Window,
+    app_state: State<AppState>,
+    scope: String,
+    key: Vec<String>,
+    value: String,
+) -> Result<(), InvokeError> {
+    let session_tx = app_state.get_session(window.label());
+    let config_scope = match scope.as_str() {
+        "user" => ConfigSource::User,
+        "repo" => ConfigSource::Repo,
+        _ => {
+            return Err(InvokeError::from_anyhow(anyhow::anyhow!(
+                "Invalid config scope"
+            )));
+        }
+    };
+    session_tx
+        .send(SessionEvent::WriteConfigEntry {
+            scope: config_scope,
+            key,
+            value,
+        })
+        .map_err(InvokeError::from_error)?;
+    Ok(())
+}
+
+#[tauri::command(async)]
+fn delete_config_entry(
+    window: Window,
+    app_state: State<AppState>,
+    scope: String,
+    key: Vec<String>,
+) -> Result<(), InvokeError> {
+    let session_tx = app_state.get_session(window.label());
+    let config_scope = match scope.as_str() {
+        "user" => ConfigSource::User,
+        "repo" => ConfigSource::Repo,
+        _ => {
+            return Err(InvokeError::from_anyhow(anyhow::anyhow!(
+                "Invalid config scope"
+            )));
+        }
+    };
+    session_tx
+        .send(SessionEvent::DeleteConfigEntry {
+            scope: config_scope,
+            key,
         })
         .map_err(InvokeError::from_error)?;
     Ok(())
