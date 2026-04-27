@@ -352,7 +352,10 @@
     }
 
     .description-list {
+        resize: vertical;
         min-height: 100px;
+        max-height: 200px;
+        overflow: auto;
         pointer-events: auto;
 
         border: 1px solid transparent;
