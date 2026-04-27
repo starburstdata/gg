@@ -152,6 +152,29 @@
             line.startsWith(" +++++++ ")
         );
     }
+
+    let descriptionHeight = 150;
+    let bodyEl: HTMLDivElement;
+    let commandsEl: HTMLDivElement;
+    let separatorEl: HTMLDivElement;
+
+    function onSeparatorPointerDown(event: PointerEvent) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        separatorEl.setPointerCapture(event.pointerId);
+    }
+
+    function onSeparatorPointerMove(event: PointerEvent) {
+        if (!separatorEl.hasPointerCapture(event.pointerId)) return;
+        let rect = bodyEl.getBoundingClientRect();
+        let targetY = event.clientY - rect.top + bodyEl.scrollTop;
+        let commandsHeight = commandsEl?.offsetHeight ?? 0;
+        descriptionHeight = Math.max(60, targetY - commandsHeight);
+    }
+
+    function onSeparatorPointerUp(event: PointerEvent) {
+        separatorEl.releasePointerCapture(event.pointerId);
+    }
 </script>
 
 <Pane>
@@ -193,7 +216,7 @@
             <span class="meta-item"><TimestampRangeSpan from={firstTimestamp} to={lastTimestamp} /></span>
         {/if}
     </div>
-    <div slot="body" class="body">
+    <div slot="body" class="body" bind:this={bodyEl}>
         {#if !singleton}
             <!-- prettier-ignore -->
             <div class="description-list">{#each revs.headers as header, i}{#if i > 0}<hr class="description-divider" />{/if}<div class="description-row">{header.description.lines.join("\n")}</div>{/each}</div>
@@ -203,6 +226,7 @@
                 spellcheck="false"
                 disabled={newestImmutable}
                 bind:value={editableDescription}
+                style="height: {descriptionHeight}px"
                 on:dragenter={dragOverWidget}
                 on:dragover={dragOverWidget}
                 on:keydown={(ev) => {
@@ -212,7 +236,7 @@
                 }}></textarea>
         {/if}
 
-        <div class="describe-commands">
+        <div class="describe-commands" bind:this={commandsEl}>
             {#if singleton}
                 <label class="reset-author-label">
                     <input type="checkbox" bind:checked={resetAuthor} disabled={newestImmutable} />
@@ -226,6 +250,19 @@
                 </ActionWidget>
             {/if}
         </div>
+
+        {#if singleton}
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <div class="description-separator"
+                 bind:this={separatorEl}
+                 role="separator"
+                 aria-orientation="horizontal"
+                 on:pointerdown={onSeparatorPointerDown}
+                 on:pointermove={onSeparatorPointerMove}
+                 on:pointerup={onSeparatorPointerUp}>
+                <div class="hit-area"></div>
+            </div>
+        {/if}
 
         {#if revs.parents.length > 0}
             <Zone operand={{ type: "Merge", header: oldest }} let:target>
@@ -345,10 +382,38 @@
     }
 
     .description {
-        resize: vertical;
-        min-height: 100px;
+        resize: none;
+        min-height: 60px;
+        flex-shrink: 0;
         overflow: auto;
         font-size: var(--gg-text-sizeMd);
+    }
+
+    .description-separator {
+        height: 3px;
+        background: var(--gg-colors-surfaceAlt);
+        cursor: row-resize;
+        position: relative;
+        pointer-events: auto;
+        flex-shrink: 0;
+    }
+
+    .description-separator:hover,
+    .description-separator:active {
+        background: var(--gg-colors-surfaceStrong);
+    }
+
+    .description-separator .hit-area {
+        position: absolute;
+        inset: -3px 0;
+        z-index: 1;
+        cursor: row-resize;
+        pointer-events: auto;
+    }
+
+    .body:has(.description-separator:active) {
+        cursor: row-resize;
+        user-select: none;
     }
 
     .description-list {
