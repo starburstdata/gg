@@ -219,7 +219,7 @@
     <div slot="body" class="body" bind:this={bodyEl}>
         {#if !singleton}
             <!-- prettier-ignore -->
-            <div class="description-list">{#each revs.headers as header, i}{#if i > 0}<hr class="description-divider" />{/if}<div class="description-row">{header.description.lines.join("\n")}</div>{/each}</div>
+            <div class="description-list" style="height: {descriptionHeight}px">{#each revs.headers as header, i}{#if i > 0}<hr class="description-divider" />{/if}<div class="description-row">{header.description.lines.join("\n")}</div>{/each}</div>
         {:else}
             <textarea
                 class="description"
@@ -251,18 +251,16 @@
             {/if}
         </div>
 
-        {#if singleton}
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <div class="description-separator"
-                 bind:this={separatorEl}
-                 role="separator"
-                 aria-orientation="horizontal"
-                 on:pointerdown={onSeparatorPointerDown}
-                 on:pointermove={onSeparatorPointerMove}
-                 on:pointerup={onSeparatorPointerUp}>
-                <div class="hit-area"></div>
-            </div>
-        {/if}
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div class="description-separator"
+             bind:this={separatorEl}
+             role="separator"
+             aria-orientation="horizontal"
+             on:pointerdown={onSeparatorPointerDown}
+             on:pointermove={onSeparatorPointerMove}
+             on:pointerup={onSeparatorPointerUp}>
+            <div class="hit-area"></div>
+        </div>
 
         {#if revs.parents.length > 0}
             <Zone operand={{ type: "Merge", header: oldest }} let:target>
@@ -417,7 +415,9 @@
     }
 
     .description-list {
-        min-height: 100px;
+        min-height: 60px;
+        flex-shrink: 0;
+        overflow: auto;
         pointer-events: auto;
 
         border: 1px solid transparent;
