@@ -8,9 +8,12 @@ jjuicy is a GUI for the version control system [Jujutsu](https://github.com/jj-v
 jjuicy is a desktop or web application with a keyboard & mouse interface. It may be available in your favourite package manager, including...
 ```
 # MacOS
-brew install --cask jjuicy
+brew tap starburstdata/jjuicy
+brew install jjuicy
+
 # Windows
 winget install --id starburst.jjuicy
+
 # Any platform supported by [Tauri](https://tauri.app/)
 cargo install --locked jjuicy-cli
 ```
