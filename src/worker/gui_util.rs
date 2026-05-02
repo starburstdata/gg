@@ -3,7 +3,7 @@
 
 use std::{
     cell::OnceCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet, VecDeque},
     path::{Path, PathBuf},
     rc::Rc,
     slice,
@@ -408,10 +408,11 @@ impl WorkspaceSession<'_> {
         }
         let log_expr = parse_revset(&self.parse_context(), log_revset_str)?;
         let repo = self.operation.repo.as_ref();
-        let log_revset = self.evaluate_revset_expr(repo, log_expr.clone())?;
+        let log_revset = self.evaluate_revset_expr(repo, log_expr)?;
         let log_contains = log_revset.containing_fn();
 
-        let mut fork_map: HashMap<CommitId, Vec<String>> = HashMap::new();
+        // collect out-of-log bookmark commits → their display labels
+        let mut commits_to_labels: HashMap<CommitId, Vec<String>> = HashMap::new();
         for (commit_id, refs) in self.ref_index().iter() {
             if log_contains(commit_id)? {
                 continue;
@@ -434,18 +435,44 @@ impl WorkspaceSession<'_> {
                     _ => None,
                 })
                 .collect();
-            if labels.is_empty() {
-                continue;
+            if !labels.is_empty() {
+                commits_to_labels
+                    .entry(commit_id.clone())
+                    .or_default()
+                    .extend(labels);
             }
-            let bookmark_expr = RevsetExpression::commit(commit_id.clone());
-            let fork_expr = log_expr.intersection(&bookmark_expr.ancestors()).heads();
-            let fork_revset = self.evaluate_revset_expr(repo, fork_expr)?;
-            for fork_id in fork_revset.iter() {
-                let fork_id = fork_id.map_err(|e| anyhow!(e))?;
-                let entry = fork_map.entry(fork_id).or_default();
-                for label in &labels {
-                    if !entry.contains(label) {
-                        entry.push(label.clone());
+        }
+
+        if self.is_large {
+            return Ok(HashMap::new());
+        }
+
+        // for each bookmark, BFS from its commit toward ancestors, stopping at log commits.
+        // those boundary log commits are the nearest visible ancestors (fork points).
+        // cost: O(depth_to_log) per bookmark instead of O(repo_size) per bookmark.
+        let mut fork_map: HashMap<CommitId, Vec<String>> = HashMap::new();
+        for (commit_id, labels) in &commits_to_labels {
+            let mut queue = VecDeque::new();
+            queue.push_back(commit_id.clone());
+            let mut visited: HashSet<CommitId> = HashSet::new();
+            visited.insert(commit_id.clone());
+
+            while let Some(current) = queue.pop_front() {
+                let commit = self.get_commit(&current)?;
+                for parent_id in commit.parent_ids() {
+                    if !visited.insert(parent_id.clone()) {
+                        continue;
+                    }
+                    if log_contains(parent_id)? {
+                        // nearest visible ancestor — record without walking further
+                        let entry = fork_map.entry(parent_id.clone()).or_default();
+                        for label in labels {
+                            if !entry.contains(label) {
+                                entry.push(label.clone());
+                            }
+                        }
+                    } else {
+                        queue.push_back(parent_id.clone());
                     }
                 }
             }
