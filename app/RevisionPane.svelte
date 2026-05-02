@@ -289,6 +289,7 @@
                         selected={$changeSelectEvent?.path?.repo_path === change.path.repo_path} />
                     {#if expandedFiles.has(change.path.repo_path)}
                         <div class="change">
+                            <div class="change-path">{change.path.relative_path}</div>
                             {#each change.hunks as hunk}
                                 <div class="hunk">
                                     <HunkObject
@@ -511,6 +512,17 @@
         font-size: small;
         margin: 0;
         pointer-events: auto;
+    }
+
+    .change-path {
+        font-family: var(--ju-text-familyCode);
+        font-size: var(--ju-text-sizeMd);
+        color: var(--ju-colors-foregroundMuted);
+        padding: 3px 6px;
+        user-select: text;
+        background: var(--ju-colors-surface);
+        border-bottom: 1px solid var(--ju-colors-outline);
+        word-break: break-all;
     }
 
     .hunk {
