@@ -402,6 +402,10 @@ impl WorkspaceSession<'_> {
         &self,
         log_revset_str: &str,
     ) -> Result<HashMap<CommitId, Vec<String>>> {
+
+        if self.is_large {
+            return Ok(HashMap::new());
+        }
         let log_expr = parse_revset(&self.parse_context(), log_revset_str)?;
         let repo = self.operation.repo.as_ref();
         let log_revset = self.evaluate_revset_expr(repo, log_expr.clone())?;
